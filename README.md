@@ -106,18 +106,19 @@ cd vcbench
 
 ### 2. Configure Conda Environment
 ```bash
-# Activate bioinformatics environment
-conda activate gthbioinfocris
+# Create and activate bioinfo environment
+conda env create -f environment.yml
+conda activate bioinfo
 
-# Install special dependencies
-pip install mamba-ssm --no-cache-dir
+# Or use the automated setup script
+./setup_environment.sh
 ```
 
 ### 3. Configure Docker
 ```bash
 # Start services
-cd vcbenchmark/docker
-docker-compose up -d
+cd docker
+docker compose up -d
 
 # Verify containers
 docker ps
@@ -126,21 +127,21 @@ docker ps
 ### 4. Initialize Database
 ```bash
 # Create tables
-cd vcbenchmark/qc-dashboard/api/app/test
-python create_tables.py
+cd qc-dashboard
+python create_db_tables.py
 ```
 
 ## Configuration
 
 ### Environment Variables
 ```bash
-# Database configuration
-export DATABASE_URL="postgresql://wgs_user:password@localhost:5432/wgs"
+# Database configuration (port 5433 to avoid conflicts)
+export DATABASE_URL="postgresql://wgs_user:password@localhost:5433/wgs"
 
 # Data directories
-export LAB_RUNS_DIR="/path/to/vcbenchmark/data/lab_runs"
-export PROCESSED_DIR="/path/to/vcbenchmark/data/processed"
-export REFERENCE_DIR="/path/to/vcbenchmark/data/reference"
+export LAB_RUNS_DIR="/path/to/vcbench/data/lab_runs"
+export PROCESSED_DIR="/path/to/vcbench/data/processed"
+export REFERENCE_DIR="/path/to/vcbench/data/reference"
 ```
 
 ### Application Configuration
@@ -148,12 +149,14 @@ Configuration files are located in:
 - `qc-dashboard/dash_app/config.py`: Frontend parameters
 - `qc-dashboard/api/app/database.py`: Database configuration
 - `docker/compose.yaml`: Docker services
+- `environment.yml`: Conda environment specification
+- `requirements.txt`: Python package requirements
 
 ## Usage
 
 ### Starting the Application
 ```bash
-cd vcbenchmark/qc-dashboard
+cd qc-dashboard
 ./start_app.sh
 ```
 
@@ -186,14 +189,17 @@ The application will be accessible at:
 ## Project Structure
 
 ```
-vcbenchmark/
+vcbench/
 ├── data/                    # Data and results
 │   ├── lab_runs/           # Raw uploaded data
 │   ├── processed/          # Processed results
 │   └── reference/          # Reference genomes and truth sets
 ├── docker/                 # Container configuration
 │   ├── compose.yaml        # Service orchestration
+│   ├── docker-compose.arm64.yaml  # ARM64-specific config
+│   ├── docker-troubleshoot.sh     # Diagnostic script
 │   ├── Dockerfile.rtg      # RTG Tools image
+│   ├── README.md           # Docker documentation
 │   └── db_start.sh         # Database initialization
 ├── pipeline/               # Bioinformatics scripts
 │   ├── happy.sh           # hap.py pipeline
@@ -205,6 +211,7 @@ vcbenchmark/
 │   │   ├── app/
 │   │   │   ├── main.py    # API entry point
 │   │   │   ├── models.py  # Data models
+│   │   │   ├── database.py # Database configuration
 │   │   │   └── api_v1/endpoints/  # API endpoints
 │   │   └── tasks/         # Asynchronous tasks
 │   ├── dash_app/          # Dash frontend
@@ -212,7 +219,13 @@ vcbenchmark/
 │   │   ├── pages/         # Interface pages
 │   │   ├── callbacks.py   # Interactive logic
 │   │   └── assets/        # Static resources
+│   ├── create_db_tables.py # Database initialization script
 │   └── start_app.sh       # Launch script
+├── environment.yml        # Conda environment specification
+├── requirements.txt       # Python package requirements
+├── setup_environment.sh   # Automated environment setup
+├── ENVIRONMENT_README.md  # Detailed environment guide
+├── CONDA_ENV_SUMMARY.md   # Environment summary
 └── emedgene_report/       # Report generation module
 ```
 
@@ -267,11 +280,12 @@ pip install pytest black flake8 mypy
 
 ### Testing
 ```bash
-# Unit tests
-pytest qc-dashboard/api/tests/
+# Database tests
+cd qc-dashboard/api/app/test
+python test_database.py
 
-# Integration tests
-pytest qc-dashboard/api/tests/integration/
+# Unit tests (when available)
+pytest qc-dashboard/api/tests/
 ```
 
 ### Code Quality
@@ -329,6 +343,36 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - ⭐ **GitHub Stars** appreciated!
 - 🔄 **Share** with your colleagues
 - 📖 **Cite** in your publications
+
+## Recent Updates (September 2025)
+
+### ✅ Environment Setup Improvements
+- **New conda environment**: `bioinfo` with all required packages
+- **Automated setup script**: `./setup_environment.sh` for easy installation
+- **Environment files**: `environment.yml` and `requirements.txt` for reproducibility
+- **Comprehensive documentation**: `ENVIRONMENT_README.md` and `CONDA_ENV_SUMMARY.md`
+
+### ✅ Docker Configuration Fixes
+- **Multi-architecture support**: AMD64 and ARM64 configurations
+- **Working services**: PostgreSQL, bcftools, and MultiQC containers
+- **Port conflict resolution**: Database on port 5433 to avoid conflicts
+- **Diagnostic tools**: `docker-troubleshoot.sh` for automated issue detection
+
+### ✅ Database Setup Improvements
+- **New script**: `create_db_tables.py` in qc-dashboard directory
+- **Fixed imports**: Resolved module path issues
+- **Correct driver**: PostgreSQL driver updated to `psycopg2`
+- **Test suite**: `test_database.py` for validation
+
+### ✅ Project Structure Updates
+- **Cleaner organization**: All setup files at root level
+- **Updated documentation**: Consistent paths and commands
+- **Environment guides**: Detailed troubleshooting and setup guides
+
+### ✅ Development Workflow
+- **Standardized commands**: Consistent across all documentation
+- **Testing framework**: Database and integration tests
+- **Code quality tools**: Black, flake8, mypy integration
 
 ---
 

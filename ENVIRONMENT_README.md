@@ -40,8 +40,8 @@ cd docker
 docker-compose up -d
 
 # 6. Initialize database
-cd ../qc-dashboard/api/app/test
-python create_tables.py
+cd ../qc-dashboard
+python create_db_tables.py
 ```
 
 ## Environment Files
@@ -151,9 +151,32 @@ export REFERENCE_DIR="/path/to/vcbench/data/reference"
 
 1. **Activate environment**: `conda activate bioinfo`
 2. **Start Docker services**: `cd docker && docker-compose up -d`
-3. **Run application**: `cd qc-dashboard && ./start_app.sh`
-4. **Access web interface**: http://localhost:8000
-5. **View API docs**: http://localhost:8000/docs
+3. **Create database tables** (first time only): `cd qc-dashboard && python create_db_tables.py`
+4. **Run application**: `cd qc-dashboard && ./start_app.sh`
+5. **Access web interface**: http://localhost:8000
+6. **View API docs**: http://localhost:8000/docs
+
+## Recent Fixes (September 2025)
+
+### Database Connection Issues
+- **Problem**: `ModuleNotFoundError: No module named 'api'` when running `create_tables.py`
+- **Solution**: Created `create_db_tables.py` script in qc-dashboard directory
+- **Usage**: `cd qc-dashboard && python create_db_tables.py`
+
+### PostgreSQL Configuration
+- **Problem**: Wrong port (5432) and driver (`psycopg` instead of `psycopg2`)
+- **Solution**: Updated `database.py` to use port 5433 and `psycopg2` driver
+- **Note**: Port 5433 avoids conflicts with other PostgreSQL instances
+
+### Docker Services
+- **Problem**: Multiple image pull failures and architecture issues on M1/M2 Macs
+- **Solution**: Updated `compose.yaml` with working images and platform specifications
+- **Status**: Core services (PostgreSQL, bcftools, MultiQC) now working
+
+### Import Path Issues
+- **Problem**: Python couldn't find `api` module from test directory
+- **Solution**: Modified scripts to change working directory to qc-dashboard before imports
+- **Result**: All imports now work correctly from appropriate directories
 
 ## Package Versions
 

@@ -30,3 +30,9 @@ email-validator>=1.1.0
 # bcftools (via conda/homebrew)
 # hap.py (via Docker)
 # Truvari (via Docker)
+
+# Development and testing (optional)
+# pytest>=6.0.0
+# black>=21.0.0
+# flake8>=4.0.0
+# mypy>=0.900

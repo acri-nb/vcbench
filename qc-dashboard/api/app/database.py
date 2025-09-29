@@ -2,7 +2,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 # Database connection URL for PostgreSQL docker container
-DATABASE_URL = 'postgresql+psycopg://wgs_user:password@localhost:5432/wgs'
+# Note: Port 5433 is used to avoid conflicts with other PostgreSQL instances
+DATABASE_URL = 'postgresql+psycopg2://wgs_user:password@localhost:5433/wgs'
 
 # Create the SQLAlchemy engine
 engine = create_engine(DATABASE_URL)
