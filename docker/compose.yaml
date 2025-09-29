@@ -1,0 +1,57 @@
+services:
+  rtg:
+    build:
+      context: .
+      dockerfile: Dockerfile.rtg
+    image: rtg-tools
+    mem_limit: 8g
+    memswap_limit: 10g
+    volumes: 
+      - ../:/wgs
+    environment:
+      - RTG_MEM=6g
+    working_dir: /wgs
+    entrypoint: [ "rtg" ]
+
+  happy:
+    build:
+      context: ../tools/hap.py
+      dockerfile: Dockerfile
+    image: happy
+    mem_limit: 48g
+    memswap_limit: 56g
+    volumes:
+      - ../:/wgs
+    environment:
+      - RTG_MEM=24g
+    working_dir: /wgs
+    entrypoint: [ "python2.7", "/opt/hap.py/bin/hap.py" ]
+    
+
+  bcftools:
+    image: staphb/bcftools:latest
+    volumes:
+      - ../:/wgs
+    working_dir: /wgs
+
+  multiqc:
+    image: multiqc/multiqc:latest
+    volumes:
+      - ../:/wgs
+    working_dir: /wgs
+
+  db:
+    container_name: wgs_db
+    image: postgres:16.9
+    environment:
+      POSTGRES_DB: wgs
+      POSTGRES_USER: wgs_user
+      POSTGRES_PASSWORD: password
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+volumes:
+  db-data:
+  
