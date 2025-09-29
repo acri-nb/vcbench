@@ -100,14 +100,14 @@ graph TB
 
 ### 1. Clone Repository
 ```bash
-git clone <repository-url>
+git clone https://github.com/acri-nb/vcbench
 cd vcbench
 ```
 
 ### 2. Configure Conda Environment
 ```bash
 # Activate bioinformatics environment
-lenv conda gthbioinfocris
+conda activate gthbioinfocris
 
 # Install special dependencies
 pip install mamba-ssm --no-cache-dir
