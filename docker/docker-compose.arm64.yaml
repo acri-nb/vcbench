@@ -3,7 +3,7 @@ services:
   db:
     container_name: wgs_db
     image: postgres:16-alpine
-    platform: linux/amd64  # Specify platform for M1/M2 Macs
+    platform: linux/arm64  # Native ARM64 for M1/M2/M3 Macs
     environment:
       POSTGRES_DB: wgs
       POSTGRES_USER: wgs_user
@@ -19,19 +19,19 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # bcftools - Essential bioinformatics tool
+  # bcftools - Essential bioinformatics tool (try ARM64 first)
   bcftools:
     image: biocontainers/bcftools:v1.9-1-deb_cv1
-    platform: linux/amd64  # Specify platform for M1/M2 Macs
+    platform: linux/arm64  # Try native ARM64 first
     volumes:
       - ../:/wgs
     working_dir: /wgs
     restart: unless-stopped
 
-  # MultiQC - Quality control reporting (optional)
+  # MultiQC - Quality control reporting (try ARM64 first)
   multiqc:
     image: multiqc/multiqc:v1.19
-    platform: linux/amd64  # Specify platform for M1/M2 Macs
+    platform: linux/arm64  # Try native ARM64 first
     volumes:
       - ../:/wgs
     working_dir: /wgs
@@ -43,7 +43,7 @@ services:
   #     context: .
   #     dockerfile: Dockerfile.rtg
   #   image: rtg-tools
-  #   platform: linux/amd64
+  #   platform: linux/arm64
   #   mem_limit: 8g
   #   memswap_limit: 10g
   #   volumes:
@@ -56,7 +56,7 @@ services:
   # hap.py - Comment out until proper image is available
   # happy:
   #   image: pkrusche/hap.py:latest
-  #   platform: linux/amd64
+  #   platform: linux/arm64
   #   mem_limit: 48g
   #   memswap_limit: 56g
   #   volumes:
@@ -68,4 +68,3 @@ services:
 
 volumes:
   db-data:
-  
