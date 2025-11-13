@@ -224,34 +224,34 @@ download_giab_reference() {
     cd "${sample_dir}"
     
     # Determine the latest version URLs based on GIAB ID
-    local base_url="https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/data"
+    local release_url="https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release"
     
     # Download small variants truth set
     log_info "Downloading small variants truth set..."
     case "$giab_id" in
         HG001)
             wget -O "${sample}_truth.vcf.gz" \
-                "${base_url}/NA12878/NISTv4.2.1/GRCh38/HG001_GRCh38_1_22_v4.2.1_benchmark.vcf.gz" || true
+                "${release_url}/NA12878_HG001/NISTv4.2.1/GRCh38/HG001_GRCh38_1_22_v4.2.1_benchmark.vcf.gz" || true
             wget -O "${sample}_confident_regions.bed" \
-                "${base_url}/NA12878/NISTv4.2.1/GRCh38/HG001_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed" || true
+                "${release_url}/NA12878_HG001/NISTv4.2.1/GRCh38/HG001_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed" || true
             ;;
         HG002)
             wget -O "${sample}_truth.vcf.gz" \
-                "${base_url}/AshkenazimTrio/analysis/NIST_HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz" || true
+                "${release_url}/AshkenazimTrio/HG002_NA24385_son/NISTv4.2.1/GRCh38/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz" || true
             wget -O "${sample}_confident_regions.bed" \
-                "${base_url}/AshkenazimTrio/analysis/NIST_HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed" || true
+                "${release_url}/AshkenazimTrio/HG002_NA24385_son/NISTv4.2.1/GRCh38/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed" || true
             ;;
         HG003)
             wget -O "${sample}_truth.vcf.gz" \
-                "${base_url}/AshkenazimTrio/analysis/NIST_HG003_GRCh38_1_22_v4.2.1_benchmark.vcf.gz" || true
+                "${release_url}/AshkenazimTrio/HG003_NA24149_father/NISTv4.2.1/GRCh38/HG003_GRCh38_1_22_v4.2.1_benchmark.vcf.gz" || true
             wget -O "${sample}_confident_regions.bed" \
-                "${base_url}/AshkenazimTrio/analysis/NIST_HG003_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed" || true
+                "${release_url}/AshkenazimTrio/HG003_NA24149_father/NISTv4.2.1/GRCh38/HG003_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed" || true
             ;;
         HG004)
             wget -O "${sample}_truth.vcf.gz" \
-                "${base_url}/AshkenazimTrio/analysis/NIST_HG004_GRCh38_1_22_v4.2.1_benchmark.vcf.gz" || true
+                "${release_url}/AshkenazimTrio/HG004_NA24143_mother/NISTv4.2.1/GRCh38/HG004_GRCh38_1_22_v4.2.1_benchmark.vcf.gz" || true
             wget -O "${sample}_confident_regions.bed" \
-                "${base_url}/AshkenazimTrio/analysis/NIST_HG004_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed" || true
+                "${release_url}/AshkenazimTrio/HG004_NA24143_mother/NISTv4.2.1/GRCh38/HG004_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed" || true
             ;;
         HG005|HG006|HG007)
             log_warning "GIAB truth sets for ${giab_id} may have different versions. Please check GIAB FTP."

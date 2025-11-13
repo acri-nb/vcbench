@@ -246,14 +246,23 @@ def process_truvari(sample, run):
     # Paths to working directories
     ref_dir_path = REFERENCE_DIR / sample / "stvar"
     run_dir_path = LAB_RUN_DIR / f"{sample}_{run}"
-    # Get the reference and run files
+    
+    # Check if SV reference files exist
     try:
         ref_vcf = next(ref_dir_path.glob('*.vcf.gz'))
         ref_bed = next(ref_dir_path.glob('*.bed'))
+    except StopIteration:
+        logger.warning(f"No SV reference files found for {sample} in {ref_dir_path}")
+        logger.warning("Skipping Truvari processing - SV truth set not available")
+        print(f"⚠️  Truvari skipped: No SV truth set available for {sample}")
+        return
+    
+    # Get the run SV VCF file
+    try:
         run_vcf = next(run_dir_path.glob('*.sv.vcf.gz'))
         ref_fasta = next(REFERENCE_DIR.glob('*.fasta'))
     except StopIteration:
-        raise FileNotFoundError("Required files not found in reference or run directories.")
+        raise FileNotFoundError("Required SV VCF file not found in run directory.")
     # Find output directory or create if it doesnt exist
     output_path = None
     for name in os.listdir(PROCESSED_DIR):

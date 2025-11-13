@@ -149,8 +149,9 @@ while IFS= read -r sample_id; do
             continue
         fi
         
-        # Filtrer et télécharger les fichiers .gvcf.gz et .csv
+        # Filtrer et télécharger les fichiers .gvcf.gz, .sv.vcf.gz et .csv
         gvcf_found=false
+        sv_found=false
         csv_found=false
         
         while IFS= read -r file; do
@@ -167,8 +168,8 @@ while IFS= read -r sample_id; do
             # Chemin de destination local (structure plate dans sample_ID_R001)
             dest_path="${output_dir}/${dest_filename}"
             
-            # Traiter les fichiers .gvcf.gz
-            if [[ "$file" == *.gvcf.gz ]]; then
+            # Traiter les fichiers .gvcf.gz (mais pas .sv.vcf.gz)
+            if [[ "$file" == *.gvcf.gz ]] && [[ "$file" != *.sv.vcf.gz ]]; then
                 total_gvcf=$((total_gvcf + 1))
                 gvcf_found=true
                 
@@ -180,6 +181,23 @@ while IFS= read -r sample_id; do
                     echo "    ⬇️  Téléchargement de ${file} → ${dest_filename} (GVCF)..."
                     if aws --profile vitalite s3 cp "${source_path}" "${dest_path}"; then
                         downloaded_gvcf=$((downloaded_gvcf + 1))
+                        echo "    ✅ ${dest_filename} téléchargé avec succès"
+                    else
+                        echo "    ❌ Erreur lors du téléchargement de ${dest_filename}"
+                    fi
+                fi
+            fi
+            
+            # Traiter les fichiers .sv.vcf.gz (structural variants)
+            if [[ "$file" == *.sv.vcf.gz ]]; then
+                sv_found=true
+                
+                # Vérifier si le fichier existe déjà localement
+                if [ -f "${dest_path}" ]; then
+                    echo "    ⏭️  ${dest_filename} (SV VCF) existe déjà, ignoré"
+                else
+                    echo "    ⬇️  Téléchargement de ${file} → ${dest_filename} (SV VCF)..."
+                    if aws --profile vitalite s3 cp "${source_path}" "${dest_path}"; then
                         echo "    ✅ ${dest_filename} téléchargé avec succès"
                     else
                         echo "    ❌ Erreur lors du téléchargement de ${dest_filename}"
@@ -213,8 +231,8 @@ while IFS= read -r sample_id; do
             
         done <<< "$files"
         
-        if [ "$gvcf_found" = false ] && [ "$csv_found" = false ]; then
-            echo "    ℹ️  Aucun fichier .gvcf.gz ou CSV de métriques trouvé pour ${sample_id}/${id}"
+        if [ "$gvcf_found" = false ] && [ "$sv_found" = false ] && [ "$csv_found" = false ]; then
+            echo "    ℹ️  Aucun fichier .gvcf.gz, .sv.vcf.gz ou CSV de métriques trouvé pour ${sample_id}/${id}"
         fi
         
     done <<< "$ids"

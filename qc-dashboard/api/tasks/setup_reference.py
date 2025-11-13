@@ -109,6 +109,10 @@ def check_genome_reference() -> Tuple[bool, List[str]]:
     required_files = {
         'FASTA': REFERENCE_DIR / 'GCA_000001405.15_GRCh38_no_alt_analysis_set.fasta',
         'FAI': REFERENCE_DIR / 'GCA_000001405.15_GRCh38_no_alt_analysis_set.fasta.fai',
+    }
+    
+    # SDF is optional (only needed for hap.py)
+    optional_files = {
         'SDF': REFERENCE_DIR / 'GRCh38.sdf',
     }
     
@@ -117,7 +121,14 @@ def check_genome_reference() -> Tuple[bool, List[str]]:
         if not path.exists():
             missing.append(name)
     
-    return len(missing) == 0, missing
+    # Check optional files but don't fail if missing
+    for name, path in optional_files.items():
+        if not path.exists():
+            missing.append(f"{name} (optional)")
+    
+    # Only fail if required files are missing
+    required_missing = [m for m in missing if "(optional)" not in m]
+    return len(required_missing) == 0, missing
 
 
 def check_sample_reference(sample_name: str) -> Tuple[bool, List[str]]:
@@ -153,14 +164,16 @@ def check_sample_reference(sample_name: str) -> Tuple[bool, List[str]]:
     # Check for SV reference (optional but recommended)
     stvar_dir = sample_dir / 'stvar'
     if not stvar_dir.exists():
-        missing.append('SV directory')
+        missing.append('SV directory (optional)')
     else:
         sv_vcf = list(stvar_dir.glob('*.vcf.gz'))
         sv_bed = list(stvar_dir.glob('*.bed'))
         if not sv_vcf or not sv_bed:
-            missing.append('SV reference files')
+            missing.append('SV reference files (optional)')
     
-    return len(missing) == 0, missing
+    # Only fail if required files are missing (not optional ones)
+    required_missing = [m for m in missing if "(optional)" not in m]
+    return len(required_missing) == 0, missing
 
 
 def check_references(sample_name: str) -> Dict[str, any]:
