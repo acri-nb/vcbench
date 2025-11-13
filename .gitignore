@@ -1,0 +1,14 @@
+/data/processed/*
+!/data/processed/.gitkeep
+/data/lab_runs/*
+!/data/lab_runs/.gitkeep
+/data/reference/*
+!/data/reference/.gitkeep
+/tools/
+__pycache__/
+/emedgene_report/json_output_emedgene.json
+/emedgene_report/clinical_report.pdf
+/qc-dashboard/api/app/test
+data/
+/script/output.txt
+/script/test.sh

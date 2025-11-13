@@ -1,0 +1,40 @@
+name: bioinfo
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  # Python
+  - python=3.9
+
+  # Web Framework & API
+  - fastapi>=0.68.0
+  - uvicorn>=0.15.0
+  - pydantic>=1.8.0
+
+  # Database
+  - sqlalchemy>=1.4.0
+  - psycopg2-binary>=2.9.0
+
+  # Data Processing
+  - pandas>=1.5.0
+  - numpy>=1.21.0
+
+  # Web Interface
+  - dash>=2.0.0
+  - plotly>=5.0.0
+
+  # Utilities
+  - python-multipart>=0.0.5
+  - aiofiles>=0.8.0
+
+  # Bioinformatics (may require manual installation)
+  # - bcftools (install via conda-forge if available, or use system package manager)
+
+  # Pip packages (will be installed separately)
+  - pip
+  - pip:
+    - httpx>=0.20.0
+    - email-validator>=1.1.0
+    # mamba-ssm (install separately due to compilation issues)
+    # - mamba-ssm

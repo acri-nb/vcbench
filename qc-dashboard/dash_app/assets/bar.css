@@ -1,0 +1,144 @@
+/* assets/bar.css */
+
+/* 1) Reset bouton natif */
+#sidebar .nav-item {
+  background: transparent;
+  border: none;
+  outline: none;
+}
+
+/* 2) Container sidebar gauche */
+#sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 4rem;                 
+  background: #273c4a;         
+  color: #dfe7ec;              
+  transition: width 0.2s ease;
+  overflow: hidden;
+  z-index: 1000;
+  box-shadow: 2px 0 6px rgba(0,0,0,0.3);
+}
+
+/* 3) Ouverture au hover */
+#sidebar:hover {
+  width: 16rem;                
+}
+
+/* 4) Élément nav-item */
+#sidebar .nav-item {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  border-radius: 6px;
+  margin: 6px 8px;
+  transition: background-color 0.2s, padding-left 0.2s;
+  color: inherit;
+}
+
+/* 5) Hover nav-item (accent coloré) */
+#sidebar .nav-item:hover {
+  background: rgba(74,144,226,0.2);
+  padding-left: 1.25rem;
+}
+
+/* 6) Icône stylée */
+#sidebar .icon {
+  width: 1.8rem;
+  height: 1.8rem;
+  background: linear-gradient(135deg, #4a90e2, #50e3c2);
+  border-radius: 0.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  color: #fff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  transition: background 0.3s, transform 0.2s;
+}
+
+#sidebar .nav-item:hover .icon {
+  transform: scale(1.15);
+  background: linear-gradient(135deg, #50e3c2, #4a90e2);
+}
+
+/* 6b) Style actif */
+#sidebar .nav-item.active .icon {
+  background: linear-gradient(135deg, #f5a623, #f8e71c);
+  transform: scale(1.1);
+}
+
+/* 7) Label caché jusqu’au hover */
+#sidebar .label {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+#sidebar:hover .label {
+  opacity: 1;
+}
+
+/* 8) Décalage du contenu central */
+#main-content {
+  margin-left: 4rem;
+  transition: margin-left 0.2s ease;
+}
+#sidebar:hover ~ #main-content {
+  margin-left: 16rem;
+}
+
+/* 9) Supprimer outline focus */
+#sidebar .nav-item:focus {
+  outline: none;
+}
+
+/* ───── Sidebar droite statuts corrigée ───── */
+#sidebar-right {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 4rem;
+  background: #273c4a;
+  color: #dfe7ec;
+  transition: width 0.2s ease;
+  overflow-x: hidden;
+  overflow-y: hidden;         /* <- désactivé par défaut */
+  max-height: 100vh;          /* <- empêche débordement */
+  z-index: 1000;
+  box-shadow: -2px 0 6px rgba(0,0,0,0.3);
+}
+
+#sidebar-right:hover {
+  width: 16rem;
+  overflow-y: auto;           /* <- activé seulement au hover */
+}
+
+/* Cache les labels tant que sidebar fermée */
+#sidebar-right .status-label {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  white-space: nowrap;
+}
+#sidebar-right:hover .status-label {
+  opacity: 1;
+}
+
+/* === Couleurs des statuts dans les dropdowns === */
+.status-pass {
+  color: black !important;
+}
+.status-warning {
+  color: #f1c40f !important;
+}
+.status-fail {
+  color: #e74c3c !important;
+}
+.status-pass:hover,
+.status-warning:hover,
+.status-fail:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}

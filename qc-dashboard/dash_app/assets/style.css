@@ -1,0 +1,170 @@
+/* style.css */
+
+/* Corps de page */
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  color: #333;
+}
+
+/* Fond plein écran UNIQUEMENT sur index */
+.index-page {
+  background: url('/assets/hero1.webp') no-repeat center center fixed;
+  background-size: cover;
+}
+
+/* Barre de titre (header) */
+header.site-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100px;
+  background: #004A8F;
+}
+
+/* Logo : fond blanc + ombre pour le faire ressortir */
+header.site-header img {
+  height: 60px;
+  margin-right: 1rem;
+  background: #FFFFFF;
+  padding: 4px;
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+/* Titre centré */
+header.site-header h1 {
+  margin: 0;
+  font-size: 1.8rem;
+  color: #FFFFFF;
+}
+
+/* Conteneur principal */
+main .container {
+  width: 90%;
+  max-width: 960px;
+  margin: 2rem auto;
+  background: rgba(255,255,255,0.9);
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+/* Style de la liste des runs */
+#runs-table div {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #EEE;
+}
+#runs-table div:last-child {
+  border-bottom: none;
+}
+
+/* Boutons (optionnel) */
+button {
+  background: #F7941D;
+  color: #FFFFFF;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+button:hover {
+  background: #e68312;
+}
+
+.alert {
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  border-radius: 4px;
+}
+
+.alert-error {
+  background: #f8d7da;
+  color: #842029;
+}
+
+.alert-success {
+  background: #d1e7dd;
+  color: #0f5132;
+}
+
+/* Dashboard layout styles */
+.section-container {
+  display: flex;
+  gap: 20px;
+  width: 100%;
+}
+
+.left, .right {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Table styling for dashboard */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+th, td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+th {
+  background-color: #444;
+  color: #fff;
+  font-weight: 600;
+  text-align: left;
+}
+tbody tr:nth-child(even) { background: #f7f7f7; }
+tbody tr:hover            { background: #e9f5ff; }
+
+/* 6. Colonnes proportionnelles (somme = 100%) */
+table th:first-child,
+table td:first-child {
+  width: 25%;                   /* Paramètre */
+}
+table th:nth-child(2),
+table td:nth-child(2) {
+  width: 15%;                   /* Référence */
+}
+table th:nth-child(3),
+table td:nth-child(3) {
+  width: 60%;                   /* Distribution */
+}
+/* 7. Mini‐plots dans les cellules */
+td.dist-cell {
+  padding: 0;
+  background: #e9f5ff;
+  border-left: 3px solid #4C78A8;
+}
+td.dist-cell iframe {
+  width: 100% !important;
+  height: 150px !important;
+  display: block;
+  border: none;
+}
+
+.text-right {
+  text-align: left;
+}
+
+.dist-cell {
+  width: 200px;
+}
+
+/* Chart container styles */
+.chart-row {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.chart-container {
+  flex: 1;
+  min-width: 0;
+}

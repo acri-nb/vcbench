@@ -1,0 +1,123 @@
+/* ================================
+   Global
+   ================================ */
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: #f5f7fa;
+  color: #333;
+  line-height: 1.5;
+}
+a {
+  color: #1a73e8;
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+/* ================================
+   Header & Nav
+   ================================ */
+header {
+  background-color: #1a73e8;
+  color: #fff;
+  padding: 1rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+header nav a {
+  color: #fff;
+  margin-left: 1rem;
+  font-weight: 500;
+}
+
+/* ================================
+   Main & Sections
+   ================================ */
+main {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+section {
+  margin-bottom: 2.5rem;
+}
+section h2 {
+  font-size: 1.25rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 2px solid #e0e0e0;
+  padding-bottom: 0.25rem;
+}
+
+/* ================================
+   Table Styling
+   ================================ */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  margin-top: 0.5rem;
+}
+thead {
+  background-color: #e8f0fe;
+}
+th, td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid #f0f0f0;
+}
+th {
+  font-weight: 600;
+  color: #1a237e;
+}
+tbody tr:nth-child(even) {
+  background-color: #f9fafb;
+}
+tbody tr:hover {
+  background-color: #f1f3f5;
+}
+
+/* ================================
+   Responsive
+   ================================ */
+@media (max-width: 768px) {
+  header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  header nav {
+    margin-top: 0.5rem;
+  }
+  table, thead, tbody, th, td, tr {
+    display: block;
+  }
+  thead {
+    display: none;
+  }
+  tr {
+    margin-bottom: 1.5rem;
+    background-color: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  td {
+    padding: 0.5rem 1rem;
+    position: relative;
+  }
+  td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    display: block;
+    margin-bottom: 0.25rem;
+    color: #555;
+  }
+}

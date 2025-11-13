@@ -1,0 +1,70 @@
+services:
+  # PostgreSQL Database - Core service required for VCBench
+  db:
+    container_name: wgs_db
+    image: postgres:16-alpine
+    platform: linux/arm64  # Native ARM64 for M1/M2/M3 Macs
+    environment:
+      POSTGRES_DB: wgs
+      POSTGRES_USER: wgs_user
+      POSTGRES_PASSWORD: password
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wgs_user -d wgs"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # bcftools - Essential bioinformatics tool (try ARM64 first)
+  bcftools:
+    image: biocontainers/bcftools:v1.9-1-deb_cv1
+    platform: linux/arm64  # Try native ARM64 first
+    volumes:
+      - ../:/wgs
+    working_dir: /wgs
+    restart: unless-stopped
+
+  # MultiQC - Quality control reporting (try ARM64 first)
+  multiqc:
+    image: multiqc/multiqc:v1.19
+    platform: linux/arm64  # Try native ARM64 first
+    volumes:
+      - ../:/wgs
+    working_dir: /wgs
+    restart: unless-stopped
+
+  # RTG Tools - Comment out until Dockerfile.rtg is properly configured
+  # rtg:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.rtg
+  #   image: rtg-tools
+  #   platform: linux/arm64
+  #   mem_limit: 8g
+  #   memswap_limit: 10g
+  #   volumes:
+  #     - ../:/wgs
+  #   environment:
+  #     - RTG_MEM=6g
+  #   working_dir: /wgs
+  #   entrypoint: [ "rtg" ]
+
+  # hap.py - Comment out until proper image is available
+  # happy:
+  #   image: pkrusche/hap.py:latest
+  #   platform: linux/arm64
+  #   mem_limit: 48g
+  #   memswap_limit: 56g
+  #   volumes:
+  #     - ../:/wgs
+  #   environment:
+  #     - RTG_MEM=24g
+  #   working_dir: /wgs
+  #   entrypoint: [ "python", "/opt/hap.py/bin/hap.py" ]
+
+volumes:
+  db-data:

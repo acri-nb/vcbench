@@ -1,0 +1,42 @@
+# VCBench Requirements
+# Core dependencies for bioinformatics pipeline and web application
+
+# Web Framework & API
+fastapi>=0.68.0
+uvicorn[standard]>=0.15.0
+pydantic[email]>=1.8.0
+
+# Database
+sqlalchemy>=1.4.0
+psycopg2-binary>=2.9.0
+
+# Data Processing
+pandas>=1.5.0
+numpy>=1.21.0
+python-multipart>=0.0.5
+
+# Web Interface
+dash>=2.0.0
+plotly>=5.0.0
+
+# HTTP & Async
+httpx>=0.20.0
+aiofiles>=0.8.0
+
+# WebSocket support
+python-socketio>=5.0.0
+websockets>=10.0
+
+# Email validation
+email-validator>=1.1.0
+
+# Bioinformatics tools (installed separately)
+# bcftools (via conda/homebrew)
+# hap.py (via Docker)
+# Truvari (via Docker)
+
+# Development and testing (optional)
+# pytest>=6.0.0
+# black>=21.0.0
+# flake8>=4.0.0
+# mypy>=0.900

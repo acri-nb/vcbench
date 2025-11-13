@@ -1,0 +1,7 @@
+# Use the base RTG Tools image
+FROM realtimegenomics/rtg-tools:latest
+
+# Install Java 11
+RUN apt-get update && \
+    apt-get install -y openjdk-11-jre-headless bash && \
+    apt-get clean
