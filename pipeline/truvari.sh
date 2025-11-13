@@ -13,8 +13,8 @@ docker run \
     --rm \
     --user "$(id -u):$(id -g)" \
     -v "$(pwd):/wgs" \
-    truvari \
-    bench \
+    quay.io/biocontainers/truvari:4.0.0--pyhdfd78af_0 \
+    truvari bench \
     -b "${docker_ref_vcf}" \
     -c "${docker_run_vcf}" \
     -o "${docker_out_dir}" \

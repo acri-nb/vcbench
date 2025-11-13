@@ -247,22 +247,14 @@ def process_truvari(sample, run):
     ref_dir_path = REFERENCE_DIR / sample / "stvar"
     run_dir_path = LAB_RUN_DIR / f"{sample}_{run}"
     
-    # Check if SV reference files exist
+    # Get the reference and run files
     try:
         ref_vcf = next(ref_dir_path.glob('*.vcf.gz'))
         ref_bed = next(ref_dir_path.glob('*.bed'))
-    except StopIteration:
-        logger.warning(f"No SV reference files found for {sample} in {ref_dir_path}")
-        logger.warning("Skipping Truvari processing - SV truth set not available")
-        print(f"⚠️  Truvari skipped: No SV truth set available for {sample}")
-        return
-    
-    # Get the run SV VCF file
-    try:
         run_vcf = next(run_dir_path.glob('*.sv.vcf.gz'))
         ref_fasta = next(REFERENCE_DIR.glob('*.fasta'))
     except StopIteration:
-        raise FileNotFoundError("Required SV VCF file not found in run directory.")
+        raise FileNotFoundError("Required files not found in reference or run directories.")
     # Find output directory or create if it doesnt exist
     output_path = None
     for name in os.listdir(PROCESSED_DIR):
@@ -276,22 +268,41 @@ def process_truvari(sample, run):
         print(f"No output path found for {run} in {PROCESSED_DIR}.\nCreating directory.")
     # Filter VCFs with bcftools
     filtered_ref_vcf = ref_dir_path / ref_vcf.name.replace('.vcf.gz', '.filtered.vcf.gz')
+    normalized_ref_vcf = ref_dir_path / ref_vcf.name.replace('.vcf.gz', '.normalized.vcf.gz')
     filtered_run_vcf = run_dir_path / run_vcf.name.replace('.vcf.gz', '.filtered.vcf.gz')
-    # Ref VCF filter
-    if not filtered_ref_vcf.exists():
+    
+    # Ref VCF filter - add chr prefix to chromosome names
+    if not normalized_ref_vcf.exists():
+        # First filter out missing variants
         bcftools_cmd = [
-        "bcftools", "view",
-        "-e", 'ALT="."',
-        "-Oz",
-        "-o", filtered_ref_vcf,
-        ref_vcf
+            "bcftools", "view",
+            "-e", 'ALT="."',
+            "-Oz",
+            "-o", filtered_ref_vcf,
+            ref_vcf
         ]
         tabix_cmd = ['tabix', '-p', 'vcf', filtered_ref_vcf]
         try:
             subprocess.run(bcftools_cmd, check=True)
             subprocess.run(tabix_cmd, check=True)
         except Exception as e:
-            print(f"bcftools failed to filter reference vcf.")
+            print(f"bcftools failed to filter reference vcf: {e}")
+            
+        # Then normalize chromosome names (add "chr" prefix)
+        annotate_cmd = [
+            "bcftools", "annotate",
+            "--rename-chrs", "/dev/stdin",
+            "-Oz",
+            "-o", normalized_ref_vcf,
+            filtered_ref_vcf
+        ]
+        # Create chromosome mapping (1->chr1, 2->chr2, etc.)
+        chrom_map = "\n".join([f"{i} chr{i}" for i in range(1, 23)] + ["X chrX", "Y chrY"])
+        try:
+            result = subprocess.run(annotate_cmd, input=chrom_map.encode(), check=True)
+            subprocess.run(['tabix', '-p', 'vcf', normalized_ref_vcf], check=True)
+        except Exception as e:
+            print(f"bcftools failed to normalize chromosome names: {e}")
     # Run VCF filter
     bcftools_cmd = [
         "bcftools", "view",
@@ -306,18 +317,35 @@ def process_truvari(sample, run):
         subprocess.run(tabix_cmd, check=True)
     except Exception as e:
         print(f"bcftools failed to filter run vcf.")
+    # Normalize BED file chromosome names (add chr prefix)
+    normalized_bed = ref_dir_path / ref_bed.name.replace('.bed', '.normalized.bed')
+    if not normalized_bed.exists():
+        try:
+            with open(ref_bed, 'r') as f_in, open(normalized_bed, 'w') as f_out:
+                for line in f_in:
+                    if line.startswith('#'):
+                        f_out.write(line)
+                    else:
+                        fields = line.strip().split('\t')
+                        # Add chr prefix if not present
+                        if not fields[0].startswith('chr'):
+                            fields[0] = f'chr{fields[0]}'
+                        f_out.write('\t'.join(fields) + '\n')
+        except Exception as e:
+            print(f"Failed to normalize BED file: {e}")
+    
     # Run Truvari
     truvari_script = PROJECT_ROOT / 'pipeline' / 'truvari.sh'
     cmd = [
         str(truvari_script),
-        to_container(filtered_ref_vcf),
+        to_container(normalized_ref_vcf),  # Use normalized reference VCF
         to_container(filtered_run_vcf),
-        to_container(ref_bed),
+        to_container(normalized_bed),  # Use normalized BED file
         to_container(output_path / 'truvari')
     ]
     try:
         subprocess.run(cmd, check=True, cwd=PROJECT_ROOT)
-        print("Successfully processed truvari for {sample} {run}")
+        print(f"Successfully processed truvari for {sample} {run}")
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"Truvari failed for {sample} {run} with error: {e}")
 
