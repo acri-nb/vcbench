@@ -34,25 +34,29 @@ VCBench is an integrated solution for evaluating and quality controlling genomic
 
 ## Features
 
-### 🔬 Bioinformatics Benchmarking
+### Bioinformatics Benchmarking
+
 - **hap.py**: Small variant evaluation (SNP, indel)
 - **Truvari**: Structural variant benchmarking
 - Precision, sensitivity and F1 score metrics
 - Automated TP/FP/FN classification
 
-### 📊 Interactive Visualization
+### Interactive Visualization
+
 - Customizable dashboards
 - Multi-sample comparative charts
 - Coverage and mapping metrics
 - Advanced statistical analysis
 
-### 🗄️ Data Management
+### Data Management
+
 - Secure DRAGEN file uploads
 - Automatic sample organization
 - Persistent result storage
 - Data and report exports
 
-### 🔧 Complete REST API
+### REST API
+
 - Endpoints for metrics and analyses
 - Run and sample management
 - Automated pipeline integration
@@ -83,15 +87,18 @@ graph TB
 ## Prerequisites
 
 ### Operating System
+
 - Linux/macOS (recommended)
 - Windows 10/11 with WSL2
 
 ### Required Software
+
 - **Docker & Docker Compose**: Version 20.10+
 - **Conda**: Miniconda or Anaconda
 - **Git**: For repository cloning
 
 ### Hardware Requirements
+
 - **RAM**: 16GB minimum (32GB recommended)
 - **Storage**: 100GB+ for genomic data
 - **CPU**: 4+ cores (8+ recommended)
@@ -99,12 +106,14 @@ graph TB
 ## Installation
 
 ### 1. Clone Repository
+
 ```bash
 git clone https://github.com/acri-nb/vcbench
 cd vcbench
 ```
 
 ### 2. Configure Conda Environment
+
 ```bash
 # Create and activate bioinfo environment
 conda env create -f environment.yml
@@ -115,6 +124,7 @@ conda activate bioinfo
 ```
 
 ### 3. Configure Docker
+
 ```bash
 # Start services
 cd docker
@@ -125,15 +135,17 @@ docker ps
 ```
 
 ### 4. Initialize Database
+
 ```bash
 # Create tables
 cd qc-dashboard
-python create_db_tables.py
+python init_db.py
 ```
 
 ## Configuration
 
 ### Environment Variables
+
 ```bash
 # Database configuration (port 5433 to avoid conflicts)
 export DATABASE_URL="postgresql://wgs_user:password@localhost:5433/wgs"
@@ -145,7 +157,9 @@ export REFERENCE_DIR="/path/to/vcbench/data/reference"
 ```
 
 ### Application Configuration
+
 Configuration files are located in:
+
 - `qc-dashboard/dash_app/config.py`: Frontend parameters
 - `qc-dashboard/api/app/database.py`: Database configuration
 - `docker/compose.yaml`: Docker services
@@ -155,14 +169,16 @@ Configuration files are located in:
 ## Usage
 
 ### Starting the Application
+
 ```bash
 cd qc-dashboard
-./start_app.sh
+uvicorn api.app.main:app --reload --host 0.0.0.0 --port 8002
 ```
 
 The application will be accessible at:
-- **Web Interface**: http://localhost:8000
-- **API Documentation**: http://localhost:8000/docs
+
+- **Web Interface**: http://localhost:8002
+- **API Documentation**: http://localhost:8002/docs
 
 ### Typical Workflow
 
@@ -219,8 +235,13 @@ vcbench/
 │   │   ├── pages/         # Interface pages
 │   │   ├── callbacks.py   # Interactive logic
 │   │   └── assets/        # Static resources
-│   ├── create_db_tables.py # Database initialization script
+│   ├── migrations/        # Database migrations
+│   ├── init_db.py         # Database initialization script
 │   └── start_app.sh       # Launch script
+├── docs/                  # Documentation
+│   ├── TRUVARI_FIX_SUMMARY.md
+│   ├── TRUVARI_VISUALIZATION_IMPLEMENTATION.md
+│   └── QUICKSTART_TRUVARI.md
 ├── environment.yml        # Conda environment specification
 ├── requirements.txt       # Python package requirements
 ├── setup_environment.sh   # Automated environment setup
@@ -234,29 +255,37 @@ vcbench/
 ### Main Endpoints
 
 #### Sample Management
+
 - `GET /api/v1/runs` - List of runs
 - `POST /api/v1/uploads` - File uploads
 - `GET /api/v1/runs/{id}` - Run details
 
 #### Quality Metrics
+
 - `GET /api/v1/qc-metrics` - General metrics
 - `GET /api/v1/happy-metrics` - hap.py results
+- `GET /api/v1/truvari-metrics` - Truvari results
+- `GET /api/v1/runs/{run_name}/truvari_metrics` - Truvari metrics by run
 - `GET /api/v1/metrics/{sample}` - Metrics by sample
 
 #### User Management
+
 - `POST /api/v1/users` - User creation
 - `GET /api/v1/users/me` - User profile
 
 ### DRAGEN Data Formats
 
 #### Files Required for hap.py
+
 - `*.gvcf.gz`: Compressed genomic VCF files
 - `*.gvcf.gz.md5sum`: MD5 checksums
 
 #### Files Required for Truvari
+
 - `*.sv.vcf.gz`: Structural variant files
 
 #### Quality Metrics
+
 - `*sv_metrics.csv`: Structural variant metrics
 - `*roh_metrics.csv`: Runs of homozygosity
 - `*ploidy_estimation_metrics.csv`: Ploidy estimation
@@ -270,6 +299,7 @@ vcbench/
 ## Development
 
 ### Development Environment Setup
+
 ```bash
 # Development mode installation
 pip install -e .
@@ -279,6 +309,7 @@ pip install pytest black flake8 mypy
 ```
 
 ### Testing
+
 ```bash
 # Database tests
 cd qc-dashboard/api/app/test
@@ -289,6 +320,7 @@ pytest qc-dashboard/api/tests/
 ```
 
 ### Code Quality
+
 ```bash
 # Formatting
 black qc-dashboard/
@@ -301,6 +333,7 @@ mypy qc-dashboard/
 ```
 
 ### Development Contribution
+
 1. Create a feature branch: `git checkout -b feature/new-functionality`
 2. Write tests for new features
 3. Follow rules defined in `.cursor/rules/`
@@ -317,11 +350,12 @@ We welcome community contributions! To contribute:
 5. Open a **Pull Request**
 
 ### Types of Contributions
-- 🐛 **Bug fixes**
-- ✨ **New features**
-- 📚 **Documentation**
-- 🧪 **Tests**
-- 🎨 **UI/UX improvements**
+
+- **Bug fixes**
+- **New features**
+- **Documentation**
+- **Tests**
+- **UI/UX improvements**
 
 ## License
 
@@ -330,46 +364,63 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Support and Contact
 
 ### Documentation
+
 - [Detailed Installation Guide](docs/installation.md)
 - [User Guide](docs/user-guide.md)
-- [API Documentation](http://localhost:8000/docs)
+- [API Documentation](http://localhost:8002/docs)
+- [Truvari Visualization Guide](docs/QUICKSTART_TRUVARI.md)
 
 ### Support
-- 🐛 **Issues**: [GitHub Issues](issues)
-- 💬 **Discussions**: [GitHub Discussions](discussions)
-- 📧 **Email**: support@vcbench.org
+
+- **Issues**: [GitHub Issues](issues)
+- **Discussions**: [GitHub Discussions](discussions)
+- **Email**: support@vcbench.org
 
 ### Community
-- ⭐ **GitHub Stars** appreciated!
-- 🔄 **Share** with your colleagues
-- 📖 **Cite** in your publications
 
-## Recent Updates (September 2025)
+- **GitHub Stars** appreciated!
+- **Share** with your colleagues
+- **Cite** in your publications
 
-### ✅ Environment Setup Improvements
+## Recent Updates
+
+### Environment Setup Improvements
+
 - **New conda environment**: `bioinfo` with all required packages
 - **Automated setup script**: `./setup_environment.sh` for easy installation
 - **Environment files**: `environment.yml` and `requirements.txt` for reproducibility
 - **Comprehensive documentation**: `ENVIRONMENT_README.md` and `CONDA_ENV_SUMMARY.md`
 
-### ✅ Docker Configuration Fixes
+### Docker Configuration Fixes
+
 - **Multi-architecture support**: AMD64 and ARM64 configurations
 - **Working services**: PostgreSQL, bcftools, and MultiQC containers
 - **Port conflict resolution**: Database on port 5433 to avoid conflicts
 - **Diagnostic tools**: `docker-troubleshoot.sh` for automated issue detection
 
-### ✅ Database Setup Improvements
-- **New script**: `create_db_tables.py` in qc-dashboard directory
+### Database Setup Improvements
+
+- **New script**: `init_db.py` in qc-dashboard directory
 - **Fixed imports**: Resolved module path issues
 - **Correct driver**: PostgreSQL driver updated to `psycopg2`
 - **Test suite**: `test_database.py` for validation
 
-### ✅ Project Structure Updates
+### Truvari Integration
+
+- **Complete visualization**: Interactive dashboard for structural variant benchmarking
+- **Automated parsing**: Automatic extraction and storage of Truvari metrics
+- **Database integration**: Full CRUD operations for Truvari results
+- **REST API endpoints**: Complete API for accessing Truvari metrics
+- **Documentation**: Comprehensive guides in `docs/` directory
+
+### Project Structure Updates
+
 - **Cleaner organization**: All setup files at root level
 - **Updated documentation**: Consistent paths and commands
 - **Environment guides**: Detailed troubleshooting and setup guides
 
-### ✅ Development Workflow
+### Development Workflow
+
 - **Standardized commands**: Consistent across all documentation
 - **Testing framework**: Database and integration tests
 - **Code quality tools**: Black, flake8, mypy integration
