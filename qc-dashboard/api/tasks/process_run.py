@@ -7,7 +7,7 @@ import subprocess
 import logging
 
 from api.app import schemas
-from api.tasks.parsers import reformat_csv, parse_summary
+from api.tasks.parsers import reformat_csv, parse_summary, parse_truvari_summary
 from api.tasks import utils
 from api.tasks.setup_reference import ensure_references
 
@@ -221,7 +221,7 @@ def post_happy_metrics(sample, run, out_dir_path):
         validated_metrics = schemas.HappyMetricCreate(**metric_data)
         print("Posting happy metric") #debug ************
         response = requests.post(
-            f"http://localhost:8000/api/v1/runs/{run_name}/happy_metrics",
+            f"http://localhost:8002/api/v1/runs/{run_name}/happy_metrics",
             json=validated_metrics.model_dump()
         )
         response.raise_for_status()
@@ -247,10 +247,20 @@ def process_truvari(sample, run):
     ref_dir_path = REFERENCE_DIR / sample / "stvar"
     run_dir_path = LAB_RUN_DIR / f"{sample}_{run}"
     
-    # Get the reference and run files
+    # Get the reference and run files (use base files, not normalized ones)
     try:
-        ref_vcf = next(ref_dir_path.glob('*.vcf.gz'))
-        ref_bed = next(ref_dir_path.glob('*.bed'))
+        # Get the base truth VCF (not normalized)
+        base_ref_vcfs = [f for f in ref_dir_path.glob('*.vcf.gz') if 'normalized' not in f.name and 'filtered' not in f.name]
+        if not base_ref_vcfs:
+            raise FileNotFoundError("No base reference VCF found")
+        ref_vcf = base_ref_vcfs[0]
+        
+        # Get the base BED file (not normalized)
+        base_beds = [f for f in ref_dir_path.glob('*.bed') if 'normalized' not in f.name]
+        if not base_beds:
+            raise FileNotFoundError("No base BED file found")
+        ref_bed = base_beds[0]
+        
         run_vcf = next(run_dir_path.glob('*.sv.vcf.gz'))
         ref_fasta = next(REFERENCE_DIR.glob('*.fasta'))
     except StopIteration:
@@ -346,8 +356,45 @@ def process_truvari(sample, run):
     try:
         subprocess.run(cmd, check=True, cwd=PROJECT_ROOT)
         print(f"Successfully processed truvari for {sample} {run}")
+        
+        # Parse and store Truvari metrics
+        summary_json = output_path / 'truvari' / 'summary.json'
+        if summary_json.exists():
+            post_truvari_metrics(sample, run, summary_json)
+        else:
+            print(f"Warning: Truvari summary.json not found at {summary_json}")
+            
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"Truvari failed for {sample} {run} with error: {e}")
+
+def post_truvari_metrics(sample, run, summary_json_path):
+    """Parse Truvari summary.json and post metrics to API"""
+    # Parse summary file
+    print(f"Parsing Truvari summary file: {summary_json_path}")
+    truvari_metrics = parse_truvari_summary(summary_json_path)
+    if not truvari_metrics:
+        print("No Truvari metrics found.")
+        return
+    
+    run_name = f"{sample}_{run}"
+    run_id = utils.get_run_id(run_name)
+    truvari_metrics["run_id"] = run_id
+    
+    # Validate and send
+    try:
+        print("Validating Truvari metric data")
+        validated_metrics = schemas.TruvariMetricCreate(**truvari_metrics)
+        print("Posting Truvari metric")
+        response = requests.post(
+            f"http://localhost:8002/api/v1/runs/{run_name}/truvari_metrics",
+            json=validated_metrics.model_dump()
+        )
+        response.raise_for_status()
+        print(f"Successfully posted Truvari metric for {run_name}.")
+    except Exception as e:
+        print(f"Validation/posting error: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            print("Response content:", e.response.text)
 
 def to_container(p: Path) -> str:
     root = PROJECT_ROOT.resolve()
@@ -383,7 +430,7 @@ def post_qc_metrics(output_file, run_name):
     """
     try:
         id = utils.get_run_id(run_name)
-        url = f"http://localhost:8000/api/v1/qc_metrics/{id}"
+        url = f"http://localhost:8002/api/v1/qc_metrics/{id}"
     except Exception as e:
         print(f"Error getting run ID for {run_name}: {e}")
         return

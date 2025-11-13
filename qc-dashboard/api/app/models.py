@@ -47,6 +47,7 @@ class LabRun(Base):
     # Relations
     qc_metrics = relationship("QCMetric", back_populates="run")
     happy_metrics = relationship("HappyMetric", back_populates="run")
+    truvari_metrics = relationship("TruvariMetric", back_populates="run")
 
 class QCMetric(Base):
     __tablename__ = "qc_metrics"
@@ -82,3 +83,38 @@ class HappyMetric(Base):
     
     run_id = Column(Integer, ForeignKey("lab_runs.id"))
     run = relationship("LabRun", back_populates="happy_metrics")
+
+class TruvariMetric(Base):
+    __tablename__ = "truvari_metrics"
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # True Positives
+    tp_base = Column(Integer, nullable=False, comment="True Positives in base (reference)")
+    tp_comp = Column(Integer, nullable=False, comment="True Positives in comparison (query)")
+    
+    # False Positives and False Negatives
+    fp = Column(Integer, nullable=False, comment="False Positives")
+    fn = Column(Integer, nullable=False, comment="False Negatives")
+    
+    # Performance metrics
+    precision = Column(Float, nullable=False, comment="Precision (TP / (TP + FP))")
+    recall = Column(Float, nullable=False, comment="Recall/Sensitivity (TP / (TP + FN))")
+    f1 = Column(Float, nullable=False, comment="F1 Score (harmonic mean of precision and recall)")
+    
+    # Variant counts
+    base_cnt = Column(Integer, nullable=False, comment="Total variants in base (after filtering)")
+    comp_cnt = Column(Integer, nullable=False, comment="Total variants in comparison (after filtering)")
+    
+    # Genotype concordance
+    gt_concordance = Column(Float, nullable=False, comment="Genotype concordance for TP variants")
+    tp_comp_tp_gt = Column(Integer, nullable=False, comment="TP-comp with correct genotype")
+    tp_comp_fp_gt = Column(Integer, nullable=False, comment="TP-comp with incorrect genotype")
+    tp_base_tp_gt = Column(Integer, nullable=False, comment="TP-base with correct genotype")
+    tp_base_fp_gt = Column(Integer, nullable=False, comment="TP-base with incorrect genotype")
+    
+    # Timestamps
+    created_at = Column(DateTime, server_default=func.now())
+    
+    # Foreign key
+    run_id = Column(Integer, ForeignKey("lab_runs.id"))
+    run = relationship("LabRun", back_populates="truvari_metrics")

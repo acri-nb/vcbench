@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent  # qc-dashboard
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from api.app.api_v1.endpoints import happy_metrics, users, runs, qc_metrics, dash, uploads, download_status
+from api.app.api_v1.endpoints import happy_metrics, users, runs, qc_metrics, dash, uploads, download_status, truvari_metrics
 from api.app import websocket as ws_manager
 
 # Import the Dash app
@@ -38,6 +38,7 @@ app.add_middleware(
 
 # Include API routers with proper prefixes (before mounting Dash)
 app.include_router(happy_metrics.router, prefix="/api/v1", tags=["happy-metrics"])
+app.include_router(truvari_metrics.router, prefix="/api/v1", tags=["truvari-metrics"])
 app.include_router(users.router, prefix="/api/v1", tags=["users"])
 app.include_router(runs.router, prefix="/api/v1", tags=["runs"])
 app.include_router(uploads.router, prefix="/api/v1", tags=["uploads"])

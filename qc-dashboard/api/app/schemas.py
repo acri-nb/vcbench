@@ -78,3 +78,32 @@ class HappyMetricResponse(HappyMetricBase):
 
     class Config:
         from_attributes = True
+
+# Truvari Metric
+
+class TruvariMetricBase(BaseModel):
+    tp_base: int
+    tp_comp: int
+    fp: int
+    fn: int
+    precision: float
+    recall: float
+    f1: float
+    base_cnt: int
+    comp_cnt: int
+    gt_concordance: float
+    tp_comp_tp_gt: int
+    tp_comp_fp_gt: int
+    tp_base_tp_gt: int
+    tp_base_fp_gt: int
+
+class TruvariMetricCreate(TruvariMetricBase):
+    run_id: int
+
+class TruvariMetricResponse(TruvariMetricBase):
+    id: int
+    run_id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

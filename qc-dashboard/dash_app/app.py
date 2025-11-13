@@ -3,7 +3,7 @@
 import dash
 from dash import html, dcc, callback, Input, Output
 
-from dash_app.pages import home, runs, index
+from dash_app.pages import home, runs, index, truvari
 from .callbacks import (
     register_callbacks,
     register_nav_callbacks,
@@ -37,6 +37,8 @@ def display_page(pathname):
         return runs.create_launch_layout()
     elif pathname == "/home" or pathname == "/home/":
         return home.build_layout()
+    elif pathname == "/truvari" or pathname == "/truvari/":
+        return truvari.create_truvari_layout()
     elif pathname == "/" or pathname is None:
         return index.create_index_layout()  # Index is now the main landing page
     else:

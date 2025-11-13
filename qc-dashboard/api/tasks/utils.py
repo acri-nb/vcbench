@@ -18,7 +18,7 @@ def get_run_id(run_name) -> int:
     Returns the run_id as an integer.
     Raises ValueError if not found.
     """
-    url = f"http://localhost:8000/api/v1/runs/by-name/{run_name}"
+    url = f"http://localhost:8002/api/v1/runs/by-name/{run_name}"
     response = requests.get(url)
     if response.status_code == 200:
         run_info = response.json()

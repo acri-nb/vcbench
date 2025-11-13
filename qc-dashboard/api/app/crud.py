@@ -156,3 +156,37 @@ def delete_happy_metric(db: Session, metric_id: int) -> bool:
         db.commit()
         return True
     return False
+
+# Truvari Metrics
+
+def create_truvari_metric(db: Session, truvari_metric: schemas.TruvariMetricCreate) -> models.TruvariMetric:
+    """Create a new Truvari metric."""
+    try:
+        db_truvari_metric = models.TruvariMetric(**truvari_metric.model_dump())
+        db.add(db_truvari_metric)
+        db.commit()
+        db.refresh(db_truvari_metric)
+        return db_truvari_metric
+    except Exception as e:
+        db.rollback()
+        raise e
+
+def get_truvari_metrics(db: Session, run_id: int) -> list[models.TruvariMetric]:
+    """Get all Truvari metrics for a run."""
+    return db.query(models.TruvariMetric).filter(models.TruvariMetric.run_id == run_id).all()
+
+def get_truvari_metric_by_run_name(db: Session, run_name: str) -> Optional[models.TruvariMetric]:
+    """Get Truvari metric by run name."""
+    lab_run = get_lab_run_by_name(db, run_name)
+    if not lab_run:
+        return None
+    return db.query(models.TruvariMetric).filter(models.TruvariMetric.run_id == lab_run.id).first()
+
+def delete_truvari_metric(db: Session, metric_id: int) -> bool:
+    """Delete a Truvari metric by ID. Returns True if deleted, False if not found."""
+    truvari_metric = db.query(models.TruvariMetric).filter(models.TruvariMetric.id == metric_id).first()
+    if truvari_metric:
+        db.delete(truvari_metric)
+        db.commit()
+        return True
+    return False
