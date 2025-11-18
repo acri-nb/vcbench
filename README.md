@@ -3,427 +3,220 @@
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.68+-green.svg)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/docker-required-blue.svg)](https://www.docker.com/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16+-blue.svg)](https://www.postgresql.org/)
 
-Comprehensive quality control platform for Whole Genome Sequencing (WGS) analysis with automated benchmarking and interactive visualization.
+Quality control platform for Whole Genome Sequencing (WGS) analysis with automated benchmarking (hap.py, Truvari) and interactive visualization.
 
-## Table of Contents
+## Quick Start
 
-- [Overview](#overview)
-- [Features](#features)
-- [Architecture](#architecture)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [Project Structure](#project-structure)
-- [REST API](#rest-api)
-- [Development](#development)
-- [Contributing](#contributing)
-- [License](#license)
+### Prerequisites
 
-## Overview
+- **Docker & Docker Compose** 20.10+
+- **Conda** (Miniconda/Anaconda)
+- **Hardware**: 16GB+ RAM, 100GB+ storage, 4+ CPU cores
 
-VCBench is an integrated solution for evaluating and quality controlling genomic sequencing data from DRAGEN platforms. The platform offers:
+### Installation
 
-- **Automated benchmarking** with hap.py and Truvari
-- **Interactive visualization** of quality metrics
-- **Centralized management** of analyses and samples
-- **Modern REST API** for system integration
-- **Responsive web interface** based on Dash
+```bash
+# 1. Clone repository
+git clone https://github.com/acri-nb/vcbench
+cd vcbench
+
+# 2. Setup environment
+conda env create -f environment.yml
+conda activate bioinfo
+# OR use automated script: ./setup_environment.sh
+
+# 3. Start Docker services
+cd docker && docker compose up -d
+
+# 4. Initialize database
+cd ../qc-dashboard
+python init_db.py
+
+# 5. Start application
+uvicorn api.app.main:app --reload --host 0.0.0.0 --port 8002
+```
+
+**Access:**
+- Web Interface: http://localhost:8002
+- API Docs: http://localhost:8002/docs
 
 ## Features
 
-### Bioinformatics Benchmarking
+### Benchmarking Tools
 
-- **hap.py**: Small variant evaluation (SNP, indel)
-- **Truvari**: Structural variant benchmarking
-- Precision, sensitivity and F1 score metrics
-- Automated TP/FP/FN classification
-
-### Interactive Visualization
-
-- Customizable dashboards
-- Multi-sample comparative charts
-- Coverage and mapping metrics
-- Advanced statistical analysis
+- **hap.py**: Small variant evaluation (SNP, indel) with precision, sensitivity, F1-score
+- **Truvari**: Structural variant benchmarking with detailed metrics
+- **Automated reference management**: Auto-downloads GIAB truth sets for known samples
 
 ### Data Management
 
-- Secure DRAGEN file uploads
-- Automatic sample organization
-- Persistent result storage
-- Data and report exports
+- **AWS S3 integration**: Direct import from S3 buckets
+- **DRAGEN file support**: Automatic processing of GVCF, metrics CSV, and checksums
+- **Reference auto-setup**: Downloads and configures reference files for GIAB samples (NA12878, NA24143, etc.)
 
-### REST API
+### Visualization & API
 
-- Endpoints for metrics and analyses
-- Run and sample management
-- Automated pipeline integration
-- Interactive OpenAPI documentation
+- Interactive Dash dashboards with multi-sample comparisons
+- RESTful API with OpenAPI documentation
+- PostgreSQL database for persistent storage
 
-## Architecture
+## Usage
 
-```mermaid
-graph TB
-    A[Dash Web Interface] --> B[FastAPI Backend]
-    B --> C[PostgreSQL Database]
-    B --> D[Bioinformatics Pipeline]
-    D --> E[hap.py Container]
-    D --> F[Truvari Container]
-    D --> G[bcftools Container]
-    H[DRAGEN Files] --> B
-    I[Reference Data] --> D
-```
+### 1. Upload Data
 
-### Technology Stack
+**Option A: Manual Upload**
+- Upload ZIP file containing DRAGEN output via web interface
+- Required files: `*.gvcf.gz`, `*.sv.vcf.gz`, `*_metrics.csv`, `*.md5sum`
 
-- **Backend**: FastAPI, SQLAlchemy, PostgreSQL
-- **Frontend**: Dash, Plotly, Custom CSS
-- **Bioinformatics**: hap.py, Truvari, bcftools, RTG Tools
-- **Containerization**: Docker, Docker Compose
-- **Language**: Python 3.8+
+**Option B: AWS S3 Import**
+- Use "Import from AWS S3" in Run Management
+- Provide sample ID (e.g., `NA24143_Lib3_Rep1`)
+- System automatically downloads files and sets up references
 
-## Prerequisites
+### 2. Run Benchmarking
 
-### Operating System
+1. Select run from dropdown
+2. Choose benchmarking tools:
+   - **hap.py**: Small variants (requires reference truth set)
+   - **Truvari**: Structural variants
+   - **CSV reformat**: Process DRAGEN metrics
+3. Click "Launch Selected Benchmarking"
 
-- Linux/macOS (recommended)
-- Windows 10/11 with WSL2
+### 3. View Results
 
-### Required Software
+- Interactive dashboards show metrics and comparisons
+- Download reports and export data
+- Access via REST API: `/api/v1/runs/{run_name}/happy_metrics` or `/truvari_metrics`
 
-- **Docker & Docker Compose**: Version 20.10+
-- **Conda**: Miniconda or Anaconda
-- **Git**: For repository cloning
+## Reference Files
 
-### Hardware Requirements
+### Automatic Setup (GIAB Samples)
 
-- **RAM**: 16GB minimum (32GB recommended)
-- **Storage**: 100GB+ for genomic data
-- **CPU**: 4+ cores (8+ recommended)
-
-## Installation
-
-### 1. Clone Repository
+For known GIAB samples (NA12878, NA24143, NA24385, etc.), reference files are downloaded automatically:
 
 ```bash
-git clone https://github.com/acri-nb/vcbench
-cd vcbench
+# Manual setup if needed
+./script/setup_reference.sh NA24143
 ```
 
-### 2. Configure Conda Environment
+### Manual Setup (Other Samples)
 
-```bash
-# Create and activate bioinfo environment
-conda env create -f environment.yml
-conda activate bioinfo
+Place reference files in `data/reference/{sample}/`:
 
-# Or use the automated setup script
-./setup_environment.sh
+```
+data/reference/
+├── GCA_000001405.15_GRCh38_no_alt_analysis_set.fasta  # Genome reference
+├── GCA_000001405.15_GRCh38_no_alt_analysis_set.fasta.fai
+├── GRCh38.sdf/                                         # RTG Tools format
+└── {sample}/
+    ├── {sample}_truth.vcf.gz                          # Truth set
+    ├── {sample}_confident_regions.bed                  # Confident regions
+    └── stvar/                                          # Structural variants (optional)
+        ├── {sample}_sv_truth.vcf.gz
+        └── {sample}_sv_confident_regions.bed
 ```
 
-### 3. Configure Docker
+See [data/struct.md](data/struct.md) for complete file structure documentation.
 
-```bash
-# Start services
-cd docker
-docker compose up -d
+## Project Structure
 
-# Verify containers
-docker ps
+```
+vcbench/
+├── data/
+│   ├── lab_runs/          # Uploaded DRAGEN files
+│   ├── processed/          # Benchmarking results
+│   └── reference/          # Reference genomes & truth sets
+├── pipeline/               # Bioinformatics scripts (happy.sh, truvari.sh)
+├── qc-dashboard/          # Main application
+│   ├── api/               # FastAPI backend
+│   └── dash_app/          # Dash frontend
+├── script/                # Utility scripts
+│   ├── aws_download_gvcf.sh      # AWS S3 download
+│   └── setup_reference.sh        # Reference setup
+└── docs/                  # Detailed documentation
 ```
 
-### 4. Initialize Database
+## API Endpoints
 
-```bash
-# Create tables
-cd qc-dashboard
-python init_db.py
-```
+### Run Management
+- `GET /api/v1/runs` - List all runs
+- `POST /api/v1/upload/aws` - Import from AWS S3
+- `POST /api/v1/runs/{run_name}/benchmarking` - Launch benchmarking
+
+### Metrics
+- `GET /api/v1/runs/{run_name}/happy_metrics` - hap.py results
+- `GET /api/v1/runs/{run_name}/truvari_metrics` - Truvari results
+- `GET /api/v1/qc-metrics` - General QC metrics
+
+Full API documentation: http://localhost:8002/docs
 
 ## Configuration
 
 ### Environment Variables
 
 ```bash
-# Database configuration (port 5433 to avoid conflicts)
 export DATABASE_URL="postgresql://wgs_user:password@localhost:5433/wgs"
-
-# Data directories
 export LAB_RUNS_DIR="/path/to/vcbench/data/lab_runs"
 export PROCESSED_DIR="/path/to/vcbench/data/processed"
 export REFERENCE_DIR="/path/to/vcbench/data/reference"
 ```
 
-### Application Configuration
+### Configuration Files
 
-Configuration files are located in:
-
-- `qc-dashboard/dash_app/config.py`: Frontend parameters
-- `qc-dashboard/api/app/database.py`: Database configuration
-- `docker/compose.yaml`: Docker services
-- `environment.yml`: Conda environment specification
-- `requirements.txt`: Python package requirements
-
-## Usage
-
-### Starting the Application
-
-```bash
-cd qc-dashboard
-uvicorn api.app.main:app --reload --host 0.0.0.0 --port 8002
-```
-
-The application will be accessible at:
-
-- **Web Interface**: http://localhost:8002
-- **API Documentation**: http://localhost:8002/docs
-
-### Typical Workflow
-
-1. **Data Upload**
-   - Compressed GVCF VCF files (.gvcf.gz)
-   - DRAGEN metrics CSV files
-   - MD5 checksum files
-
-2. **Benchmarking Configuration**
-   - Sample selection
-   - Tool selection (hap.py, Truvari)
-   - Parameter configuration
-
-3. **Automated Execution**
-   - Containerized bioinformatics pipeline
-   - Quality metrics calculation
-   - Result storage
-
-4. **Analysis and Visualization**
-   - Interactive dashboards
-   - Multi-sample comparisons
-   - Report exports
-
-## Project Structure
-
-```
-vcbench/
-├── data/                    # Data and results
-│   ├── lab_runs/           # Raw uploaded data
-│   ├── processed/          # Processed results
-│   └── reference/          # Reference genomes and truth sets
-├── docker/                 # Container configuration
-│   ├── compose.yaml        # Service orchestration
-│   ├── docker-compose.arm64.yaml  # ARM64-specific config
-│   ├── docker-troubleshoot.sh     # Diagnostic script
-│   ├── Dockerfile.rtg      # RTG Tools image
-│   ├── README.md           # Docker documentation
-│   └── db_start.sh         # Database initialization
-├── pipeline/               # Bioinformatics scripts
-│   ├── happy.sh           # hap.py pipeline
-│   ├── truvari.sh         # Truvari pipeline
-│   ├── vcf_filter.py      # VCF filtering
-│   └── *.py               # Processing scripts
-├── qc-dashboard/          # Main application
-│   ├── api/               # FastAPI backend
-│   │   ├── app/
-│   │   │   ├── main.py    # API entry point
-│   │   │   ├── models.py  # Data models
-│   │   │   ├── database.py # Database configuration
-│   │   │   └── api_v1/endpoints/  # API endpoints
-│   │   └── tasks/         # Asynchronous tasks
-│   ├── dash_app/          # Dash frontend
-│   │   ├── app.py         # Main application
-│   │   ├── pages/         # Interface pages
-│   │   ├── callbacks.py   # Interactive logic
-│   │   └── assets/        # Static resources
-│   ├── migrations/        # Database migrations
-│   ├── init_db.py         # Database initialization script
-│   └── start_app.sh       # Launch script
-├── docs/                  # Documentation
-│   ├── TRUVARI_FIX_SUMMARY.md
-│   ├── TRUVARI_VISUALIZATION_IMPLEMENTATION.md
-│   └── QUICKSTART_TRUVARI.md
-├── environment.yml        # Conda environment specification
-├── requirements.txt       # Python package requirements
-├── setup_environment.sh   # Automated environment setup
-├── ENVIRONMENT_README.md  # Detailed environment guide
-├── CONDA_ENV_SUMMARY.md   # Environment summary
-└── emedgene_report/       # Report generation module
-```
-
-## REST API
-
-### Main Endpoints
-
-#### Sample Management
-
-- `GET /api/v1/runs` - List of runs
-- `POST /api/v1/uploads` - File uploads
-- `GET /api/v1/runs/{id}` - Run details
-
-#### Quality Metrics
-
-- `GET /api/v1/qc-metrics` - General metrics
-- `GET /api/v1/happy-metrics` - hap.py results
-- `GET /api/v1/truvari-metrics` - Truvari results
-- `GET /api/v1/runs/{run_name}/truvari_metrics` - Truvari metrics by run
-- `GET /api/v1/metrics/{sample}` - Metrics by sample
-
-#### User Management
-
-- `POST /api/v1/users` - User creation
-- `GET /api/v1/users/me` - User profile
-
-### DRAGEN Data Formats
-
-#### Files Required for hap.py
-
-- `*.gvcf.gz`: Compressed genomic VCF files
-- `*.gvcf.gz.md5sum`: MD5 checksums
-
-#### Files Required for Truvari
-
-- `*.sv.vcf.gz`: Structural variant files
-
-#### Quality Metrics
-
-- `*sv_metrics.csv`: Structural variant metrics
-- `*roh_metrics.csv`: Runs of homozygosity
-- `*ploidy_estimation_metrics.csv`: Ploidy estimation
-- `*cnv_metrics.csv`: Copy number variations
-- `*bed_coverage_metrics.csv`: Coverage metrics
-- `*wgs_contig_mean_cov.csv`: Contig-level coverage
-- `*vc_metrics.csv`: Variant calling metrics
-- `*vc_hethome_ratio_metrics.csv`: Heterozygote/homozygote ratio
-- `*mapping_metrics.csv`: Mapping metrics
+- `qc-dashboard/dash_app/config.py` - Frontend configuration
+- `qc-dashboard/api/app/database.py` - Database settings
+- `docker/compose.yaml` - Docker services
 
 ## Development
 
-### Development Environment Setup
-
 ```bash
-# Development mode installation
-pip install -e .
-
 # Install development dependencies
 pip install pytest black flake8 mypy
-```
 
-### Testing
-
-```bash
-# Database tests
+# Run tests
 cd qc-dashboard/api/app/test
 python test_database.py
 
-# Unit tests (when available)
-pytest qc-dashboard/api/tests/
-```
-
-### Code Quality
-
-```bash
-# Formatting
+# Code formatting
 black qc-dashboard/
-
-# Style checking
 flake8 qc-dashboard/
-
-# Type checking
-mypy qc-dashboard/
 ```
 
-### Development Contribution
+## Documentation
 
-1. Create a feature branch: `git checkout -b feature/new-functionality`
-2. Write tests for new features
-3. Follow rules defined in `.cursor/rules/`
-4. Submit a pull request with detailed description
-
-## Contributing
-
-We welcome community contributions! To contribute:
-
-1. **Fork** the repository
-2. Create a **feature branch** (`git checkout -b feature/AmazingFeature`)
-3. **Commit** your changes (`git commit -m 'Add some AmazingFeature'`)
-4. **Push** to the branch (`git push origin feature/AmazingFeature`)
-5. Open a **Pull Request**
-
-### Types of Contributions
-
-- **Bug fixes**
-- **New features**
-- **Documentation**
-- **Tests**
-- **UI/UX improvements**
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Support and Contact
-
-### Documentation
-
-- [Detailed Installation Guide](docs/installation.md)
-- [User Guide](docs/user-guide.md)
-- [API Documentation](http://localhost:8002/docs)
-- [Truvari Visualization Guide](docs/QUICKSTART_TRUVARI.md)
-
-### Support
-
-- **Issues**: [GitHub Issues](issues)
-- **Discussions**: [GitHub Discussions](discussions)
-- **Email**: support@vcbench.org
-
-### Community
-
-- **GitHub Stars** appreciated!
-- **Share** with your colleagues
-- **Cite** in your publications
+- **[Quick Start Guide](docs/QUICKSTART.md)** - Getting started tutorial
+- **[Truvari Guide](docs/QUICKSTART_TRUVARI.md)** - Structural variant benchmarking
+- **[File Structure](data/struct.md)** - Complete file structure reference
+- **[Environment Setup](ENVIRONMENT_README.md)** - Detailed environment configuration
+- **[AWS Integration](docs/AWS_INTEGRATION_README.md)** - AWS S3 import guide
 
 ## Recent Updates
 
-### Environment Setup Improvements
+### hap.py Integration
+- ✅ Fixed reference file path resolution (base sample extraction)
+- ✅ Automatic reference download for GIAB samples
+- ✅ Improved error handling and logging
 
-- **New conda environment**: `bioinfo` with all required packages
-- **Automated setup script**: `./setup_environment.sh` for easy installation
-- **Environment files**: `environment.yml` and `requirements.txt` for reproducibility
-- **Comprehensive documentation**: `ENVIRONMENT_README.md` and `CONDA_ENV_SUMMARY.md`
+### AWS S3 Integration
+- ✅ Direct import from S3 buckets
+- ✅ Automatic file organization and processing
+- ✅ Background task execution with progress tracking
 
-### Docker Configuration Fixes
+### Truvari Visualization
+- ✅ Interactive dashboard for structural variants
+- ✅ Automated metric parsing and storage
+- ✅ Complete REST API endpoints
 
-- **Multi-architecture support**: AMD64 and ARM64 configurations
-- **Working services**: PostgreSQL, bcftools, and MultiQC containers
-- **Port conflict resolution**: Database on port 5433 to avoid conflicts
-- **Diagnostic tools**: `docker-troubleshoot.sh` for automated issue detection
+## Support
 
-### Database Setup Improvements
+- **Issues**: [GitHub Issues](https://github.com/acri-nb/vcbench/issues)
+- **API Docs**: http://localhost:8002/docs
+- **Email**: support@vcbench.org
 
-- **New script**: `init_db.py` in qc-dashboard directory
-- **Fixed imports**: Resolved module path issues
-- **Correct driver**: PostgreSQL driver updated to `psycopg2`
-- **Test suite**: `test_database.py` for validation
+## License
 
-### Truvari Integration
-
-- **Complete visualization**: Interactive dashboard for structural variant benchmarking
-- **Automated parsing**: Automatic extraction and storage of Truvari metrics
-- **Database integration**: Full CRUD operations for Truvari results
-- **REST API endpoints**: Complete API for accessing Truvari metrics
-- **Documentation**: Comprehensive guides in `docs/` directory
-
-### Project Structure Updates
-
-- **Cleaner organization**: All setup files at root level
-- **Updated documentation**: Consistent paths and commands
-- **Environment guides**: Detailed troubleshooting and setup guides
-
-### Development Workflow
-
-- **Standardized commands**: Consistent across all documentation
-- **Testing framework**: Database and integration tests
-- **Code quality tools**: Black, flake8, mypy integration
+MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
