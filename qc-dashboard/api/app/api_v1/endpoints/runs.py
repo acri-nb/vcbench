@@ -137,7 +137,30 @@ def get_run_benchmarking(run_name: str, db: Session = Depends(get_db)):
 @router.post("/runs/{run_name}/benchmarking")
 async def process_run_benchmarking(run_name: str, benchmarking: str):
     try:
-        sample, run = run_name.split("_", 1)
+        # Split run_name to extract sample and run
+        # Format: NA24143_Lib3_Rep1_R001 -> sample=NA24143_Lib3_Rep1, run=R001
+        parts = run_name.split("_")
+        if len(parts) < 2:
+            raise HTTPException(status_code=400, detail=f"Invalid run name format: {run_name}")
+        
+        # Find where "R001" or similar run identifier starts
+        # Assume the run identifier is the last part that starts with 'R'
+        run_idx = -1
+        for i in range(len(parts) - 1, -1, -1):
+            if parts[i].startswith('R') and parts[i][1:].isdigit():
+                run_idx = i
+                break
+        
+        if run_idx == -1:
+            # Fallback: treat everything before last underscore as sample
+            sample = "_".join(parts[:-1])
+            run = parts[-1]
+        else:
+            sample = "_".join(parts[:run_idx])
+            run = "_".join(parts[run_idx:])
+        
+        print(f"[runs.py] Benchmarking run_name={run_name}, extracted sample={sample}, run={run}")
+        
         run_pipeline(
             sample,
             run,
@@ -146,5 +169,8 @@ async def process_run_benchmarking(run_name: str, benchmarking: str):
             csv_reformat="csv" in benchmarking,
             truvari="truvari" in benchmarking
         )
+        return {"status": "success", "message": f"Benchmarking started for {run_name}"}
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error processing run: {str(e)}")

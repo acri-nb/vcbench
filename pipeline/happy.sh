@@ -11,24 +11,24 @@ docker_out_dir="$6"
 docker_logfile="$7"
 shift 7  # shift the first 7 positional args so "$@" becomes remaining args (e.g., --stratification ...)
 
+# Run hap.py with proper Docker settings
 docker run \
+    --rm \
     --cpus=6 \
     --memory=48g \
     --memory-swap=56g \
     -e RTG_MEM=24g \
-    -e HGREF=wgs/data/reference/GCA_000001405.15_GRCh38_no_alt_analysis_set.fasta \
-    -it \
+    -e HGREF=/wgs/data/reference/GCA_000001405.15_GRCh38_no_alt_analysis_set.fasta \
     -v "$(pwd):/wgs" \
-    hap.py \
+    pkrusche/hap.py:latest \
     /opt/hap.py/bin/hap.py \
     "${docker_ref_vcf}" \
     "${docker_run_gvcf}" \
     --engine xcmp \
-    --gender male \
-    --convert-gvcf-query \
+    --pass-only \
     --logfile "${docker_logfile}" \
     --threads 6 \
     -f "${docker_ref_bed}" \
-    -r wgs/data/reference/GCA_000001405.15_GRCh38_no_alt_analysis_set.fasta \
+    -r /wgs/data/reference/GCA_000001405.15_GRCh38_no_alt_analysis_set.fasta \
     -o "${docker_out_dir}" \
     "$@"  # <- pass remaining args like --stratification if any

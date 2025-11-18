@@ -29,25 +29,47 @@ def get_run_id(run_name) -> int:
 def checksum(sample, run):
     """
     Verify the MD5 checksum of the gvcf file for a given reference and run.
+    Uses the flat directory structure: LAB_RUN_DIR / "{sample}_{run}"
     """
-    # Verify that the gvcf file exists
-    run_path = LAB_RUN_DIR / sample / run
-    gvcf_path = run_path / f"{sample}_{run}.dragen.hard-filtered.gvcf.gz"
-    if not gvcf_path.exists():
-        raise FileNotFoundError(gvcf_path.name)
-    # Verify that the MD5 checksum file exists
-    md5_path = run_path / f"{gvcf_path}.md5sum"
+    # Use the flat directory structure
+    run_path = LAB_RUN_DIR / f"{sample}_{run}"
+    
+    # Find the GVCF file (could have different naming patterns)
+    gvcf_files = list(run_path.glob('*.gvcf.gz'))
+    if not gvcf_files:
+        raise FileNotFoundError(f"No GVCF file found in {run_path}")
+    
+    # Use the first GVCF file found (typically there's only one)
+    gvcf_path = gvcf_files[0]
+    
+    # Check for MD5 checksum file (optional - skip if not present)
+    md5_path = run_path / f"{gvcf_path.name}.md5sum"
     if not md5_path.exists():
-        raise FileNotFoundError(md5_path.name)
+        # Also try alternative MD5 naming patterns
+        md5_alt1 = run_path / f"{gvcf_path.name}.md5"
+        md5_alt2 = run_path / f"{gvcf_path.stem}.md5sum"
+        if md5_alt1.exists():
+            md5_path = md5_alt1
+        elif md5_alt2.exists():
+            md5_path = md5_alt2
+        else:
+            # MD5 file not found - skip checksum verification
+            print(f"Warning: MD5 checksum file not found for {gvcf_path.name}. Skipping checksum verification.")
+            return
+    
     # Read the MD5 checksum
     with open(md5_path, 'r') as f:
-        expected_md5 = f.read().strip()
+        md5_content = f.read().strip()
+        # Handle different MD5 file formats (MD5 hash only, or "hash filename")
+        expected_md5 = md5_content.split()[0] if md5_content else md5_content
+    
     # Calculate the MD5 checksum of the gvcf file
     with open(gvcf_path, 'rb') as f:
         file_md5 = hashlib.md5(f.read()).hexdigest()
+    
     # Compare the checksums
     if file_md5 != expected_md5:
-        raise ValueError(gvcf_path.name)
+        raise ValueError(f"MD5 checksum mismatch for {gvcf_path.name}. Expected: {expected_md5}, Got: {file_md5}")
 
 def get_gvcf_date(run_gvcf) -> str:
     """

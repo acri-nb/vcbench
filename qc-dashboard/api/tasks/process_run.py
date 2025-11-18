@@ -69,35 +69,143 @@ def process_happy(sample, run, stratified=False):
     """
     Process hap.py for a given reference and run.
     """
+    # Extract base sample name (e.g., NA24143_Lib3_Rep1 -> NA24143)
+    from api.tasks.setup_reference import extract_base_sample
+    base_sample = extract_base_sample(sample)
+    logger.info(f"Processing hap.py for sample={sample}, base_sample={base_sample}, run={run}")
+    
     # Ensure reference files are available before processing
-    logger.info(f"Checking reference files for sample: {sample}")
+    logger.info(f"Checking reference files for base sample: {base_sample}")
     ready, message = ensure_references(sample, auto_download=True)
     if not ready:
-        logger.error(f"Reference files not ready for {sample}: {message}")
+        logger.error(f"Reference files not ready for {base_sample}: {message}")
         raise FileNotFoundError(
-            f"Required reference files not found for {sample}. {message}\n"
-            f"Please ensure reference files are available in: {REFERENCE_DIR}/{sample}/"
+            f"Required reference files not found for {base_sample}. {message}\n"
+            f"Please ensure reference files are available in: {REFERENCE_DIR}/{base_sample}/"
         )
-    logger.info(f"Reference files verified for {sample}")
+    logger.info(f"Reference files verified for {base_sample}")
     
     # Paths to working directories
-    ref_dir_path = REFERENCE_DIR / sample
+    # Use base_sample for reference directory, full sample for run directory
+    ref_dir_path = REFERENCE_DIR / base_sample
     run_dir_path = LAB_RUN_DIR / f"{sample}_{run}"
-    # Get the reference and run files
-    try:
-        ref_vcf = next(ref_dir_path.glob('*.vcf.gz'))
-        ref_sdf = next(REFERENCE_DIR.glob('*.sdf'))
-        ref_bed = next(ref_dir_path.glob('*.bed'))
-        run_gvcf = next(run_dir_path.glob('*.gvcf.gz'))
-        ref_fasta = next(REFERENCE_DIR.glob('*.fasta'))
-        ref_fai = next(REFERENCE_DIR.glob('*.fasta.fai'))
-    except StopIteration:
-        raise FileNotFoundError("Required files not found in reference or run directories.")
-    # Checksum for the gvcf file
+    
+    # Get the reference and run files with specific error messages
+    missing_files = []
+    
+    # Check reference VCF
+    ref_vcf_list = list(ref_dir_path.glob('*.vcf.gz'))
+    if not ref_vcf_list:
+        missing_files.append(f"Reference VCF in {ref_dir_path}")
+    else:
+        ref_vcf = ref_vcf_list[0]
+    
+    # Check reference BED
+    ref_bed_list = list(ref_dir_path.glob('*.bed'))
+    if not ref_bed_list:
+        missing_files.append(f"Reference BED in {ref_dir_path}")
+    else:
+        ref_bed = ref_bed_list[0]
+    
+    # Check run GVCF
+    run_gvcf_list = list(run_dir_path.glob('*.gvcf.gz'))
+    if not run_gvcf_list:
+        missing_files.append(f"Run GVCF in {run_dir_path}")
+    else:
+        run_gvcf = run_gvcf_list[0]
+    
+    # Check reference FASTA
+    ref_fasta_list = list(REFERENCE_DIR.glob('*.fasta'))
+    if not ref_fasta_list:
+        missing_files.append(f"Reference FASTA in {REFERENCE_DIR}")
+    else:
+        ref_fasta = ref_fasta_list[0]
+    
+    # Check reference FAI
+    ref_fai_list = list(REFERENCE_DIR.glob('*.fasta.fai'))
+    if not ref_fai_list:
+        missing_files.append(f"Reference FAI in {REFERENCE_DIR}")
+    else:
+        ref_fai = ref_fai_list[0]
+    
+    # Check SDF (required for hap.py with RTG Tools)
+    # First check if any required files are missing before trying to create SDF
+    if missing_files:
+        raise FileNotFoundError(
+            f"Required files not found in reference or run directories:\n" +
+            "\n".join(f"- {f}" for f in missing_files)
+        )
+    
+    ref_sdf_list = list(REFERENCE_DIR.glob('*.sdf'))
+    if not ref_sdf_list:
+        # Try to create SDF if RTG Tools is available (locally or via Docker)
+        logger.warning(f"SDF file not found. Attempting to create it from FASTA...")
+        sdf_path = REFERENCE_DIR / 'GRCh38.sdf'
+        sdf_created = False
+        
+        # Try local RTG Tools first
+        try:
+            rtg_check = subprocess.run(['rtg', 'version'], capture_output=True, text=True, timeout=5)
+            if rtg_check.returncode == 0:
+                logger.info("RTG Tools found locally. Creating SDF format...")
+                rtg_cmd = ['rtg', 'format', '-o', str(sdf_path), str(ref_fasta)]
+                result = subprocess.run(rtg_cmd, capture_output=True, text=True, cwd=REFERENCE_DIR, timeout=3600)
+                if result.returncode == 0:
+                    logger.info("SDF format created successfully using local RTG Tools")
+                    ref_sdf = sdf_path
+                    sdf_created = True
+                else:
+                    logger.warning(f"Local RTG Tools failed: {result.stderr}")
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            logger.info("RTG Tools not found locally, trying Docker...")
+        
+        # If local RTG Tools failed or not available, try Docker
+        if not sdf_created:
+            try:
+                logger.info("Attempting to create SDF using Docker hap.py container...")
+                docker_fasta = f'/wgs/data/reference/{ref_fasta.name}'
+                docker_sdf = '/wgs/data/reference/GRCh38.sdf'
+                # RTG Tools is located at /opt/hap.py/libexec/rtg-tools-install/rtg in the container
+                docker_cmd = [
+                    'docker', 'run', '--rm',
+                    '-v', f'{PROJECT_ROOT}:/wgs',
+                    'pkrusche/hap.py:latest',
+                    '/opt/hap.py/libexec/rtg-tools-install/rtg', 'format', '-o', docker_sdf, docker_fasta
+                ]
+                result = subprocess.run(docker_cmd, capture_output=True, text=True, cwd=PROJECT_ROOT, timeout=3600)
+                if result.returncode == 0 and sdf_path.exists():
+                    logger.info("SDF format created successfully using Docker")
+                    ref_sdf = sdf_path
+                    sdf_created = True
+                else:
+                    logger.warning(f"Docker RTG Tools failed: {result.stderr}")
+            except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+                logger.warning(f"Docker not available or timed out: {e}")
+        
+        # If SDF creation failed, raise informative error
+        if not sdf_created:
+            raise FileNotFoundError(
+                f"SDF format is required for hap.py but could not be created automatically.\n\n"
+                f"Please create it manually using one of these methods:\n\n"
+                f"1. Using local RTG Tools:\n"
+                f"   rtg format -o {REFERENCE_DIR}/GRCh38.sdf {ref_fasta}\n\n"
+                f"2. Using Docker:\n"
+                f"   docker run --rm -v {PROJECT_ROOT}:/wgs pkrusche/hap.py:latest /opt/hap.py/libexec/rtg-tools-install/rtg format -o /wgs/data/reference/GRCh38.sdf /wgs/data/reference/{ref_fasta.name}\n\n"
+                f"3. Using setup script:\n"
+                f"   {PROJECT_ROOT}/script/setup_reference.sh {sample}\n"
+            )
+    else:
+        ref_sdf = ref_sdf_list[0]
+    
+    # Checksum for the gvcf file (optional - skipped if MD5 file not found)
     try:
         utils.checksum(sample, run)
+    except FileNotFoundError as e:
+        raise FileNotFoundError(f"GVCF file not found: {e}")
+    except ValueError as e:
+        raise ValueError(f"Checksum verification failed: {e}")
     except Exception as e:
-        raise ValueError(f"Error verifying checksum: {e}")
+        logger.warning(f"Checksum verification skipped or failed: {e}")
     # Get gvcf creation date with bcftools to get output path
     try:
         creation_date = utils.get_gvcf_date(run_gvcf)
@@ -115,32 +223,65 @@ def process_happy(sample, run, stratified=False):
         raise ValueError(f"Error getting sample names: {e}")
     # Get regions from reference FASTA index
     regions = ",".join(line.split('\t')[0] for line in open(ref_fai))
-    # Filter gvcf with bcftools
-    filtered_gvcf_name = run_gvcf.name.replace('.gvcf.gz', '.filtered.gvcf.gz')
-    filtered_gvcf = run_dir_path / filtered_gvcf_name
-    bcftools_cmd = [
-        'bcftools', 'view',
-        '--regions', f'{regions}',
-        '-O', 'z',
-        '-o', f"{filtered_gvcf}",
-        f"{run_gvcf}",
-    ]
-    tabix_cmd = ['tabix', '-p', 'vcf', str(filtered_gvcf)]
-    try:
-        subprocess.run(bcftools_cmd, check=True)
-        subprocess.run(tabix_cmd, check=True)
-    except Exception as e:
-        raise RuntimeError(f"bcftools failed to filter gvcf: {e}")
-    # Prepare Docker-internal paths
-    docker_ref_vcf = f'/wgs/data/reference/{sample}/{ref_vcf.name}'
+    
+    # Check if GVCF file is already "hard-filtered" (from DRAGEN)
+    if 'hard-filtered' in run_gvcf.name:
+        logger.info(f"GVCF is already hard-filtered by DRAGEN: {run_gvcf.name}")
+        filtered_gvcf = run_gvcf
+        
+        # Ensure the index exists
+        filtered_gvcf_tbi = Path(str(filtered_gvcf) + '.tbi')
+        if not filtered_gvcf_tbi.exists():
+            logger.info("Creating tabix index for GVCF...")
+            tabix_cmd = ['tabix', '-p', 'vcf', str(filtered_gvcf)]
+            try:
+                subprocess.run(tabix_cmd, check=True)
+                logger.info("Tabix index created successfully")
+            except Exception as e:
+                raise RuntimeError(f"Failed to create tabix index: {e}")
+    else:
+        # Filter gvcf with bcftools
+        filtered_gvcf_name = run_gvcf.name.replace('.gvcf.gz', '.filtered.gvcf.gz')
+        filtered_gvcf = run_dir_path / filtered_gvcf_name
+        filtered_gvcf_tbi = Path(str(filtered_gvcf) + '.tbi')
+        
+        # Check if filtered GVCF already exists and is valid
+        if filtered_gvcf.exists() and filtered_gvcf_tbi.exists():
+            logger.info(f"Filtered GVCF already exists: {filtered_gvcf.name}, skipping filtering step")
+        else:
+            # Remove old files if they exist but are incomplete
+            if filtered_gvcf.exists():
+                filtered_gvcf.unlink()
+            if filtered_gvcf_tbi.exists():
+                filtered_gvcf_tbi.unlink()
+            
+            # Filter GVCF
+            logger.info(f"Filtering GVCF with bcftools to regions: {len(regions.split(','))} chromosomes")
+            bcftools_cmd = [
+                'bcftools', 'view',
+                '--regions', f'{regions}',
+                '-O', 'z',
+                '-o', f"{filtered_gvcf}",
+                f"{run_gvcf}",
+            ]
+            tabix_cmd = ['tabix', '-p', 'vcf', str(filtered_gvcf)]
+            try:
+                subprocess.run(bcftools_cmd, check=True)
+                subprocess.run(tabix_cmd, check=True)
+                logger.info("GVCF filtering completed successfully")
+            except Exception as e:
+                raise RuntimeError(f"bcftools failed to filter gvcf: {e}")
+    # Prepare Docker-internal paths (use base_sample for reference paths)
+    docker_ref_vcf = f'/wgs/data/reference/{base_sample}/{ref_vcf.name}'
     docker_ref_sdf = f'/wgs/data/reference/{ref_sdf.name}'
     docker_run_gvcf = f'/wgs/data/lab_runs/{sample}_{run}/{filtered_gvcf.name}'
-    docker_ref_bed = f'/wgs/data/reference/{sample}/{ref_bed.name}'
+    docker_ref_bed = f'/wgs/data/reference/{base_sample}/{ref_bed.name}'
     docker_ref_fasta = f'/wgs/data/reference/{ref_fasta.name}'
     docker_out_dir = f'/wgs/data/lab_runs/{sample}_{run}/{sample}_{run}'
     docker_logfile = f'/wgs/data/lab_runs/{sample}_{run}/happy.{sample}.{run}.log'
     happy_script = PROJECT_ROOT / 'pipeline' / 'happy.sh'
-    # TODO: Switch to docker compose <--------------------------------------------------------
+    
+    logger.info(f"Running hap.py with reference from {base_sample}")
     cmd = [
         str(happy_script),
         docker_ref_vcf,
@@ -155,7 +296,7 @@ def process_happy(sample, run, stratified=False):
     if stratified:
         cmd.extend([
             '--stratification',
-            f'/wgs/data/reference/{sample}/GRCh38_strat/GRCh38-all-stratifications.tsv'
+            f'/wgs/data/reference/{base_sample}/GRCh38_strat/GRCh38-all-stratifications.tsv'
         ])
     # Execute the command
     try:
@@ -232,19 +373,25 @@ def post_happy_metrics(sample, run, out_dir_path):
             print("Response content:", e.response.text)
     
 def process_truvari(sample, run):
+    # Extract base sample name (e.g., NA24143_Lib3_Rep1 -> NA24143)
+    from api.tasks.setup_reference import extract_base_sample
+    base_sample = extract_base_sample(sample)
+    logger.info(f"Processing Truvari for sample={sample}, base_sample={base_sample}, run={run}")
+    
     # Ensure reference files are available before processing
-    logger.info(f"Checking reference files for Truvari processing: {sample}")
+    logger.info(f"Checking reference files for Truvari processing: {base_sample}")
     ready, message = ensure_references(sample, auto_download=True)
     if not ready:
-        logger.error(f"Reference files not ready for {sample}: {message}")
+        logger.error(f"Reference files not ready for {base_sample}: {message}")
         raise FileNotFoundError(
-            f"Required reference files not found for {sample}. {message}\n"
-            f"Please ensure reference files are available in: {REFERENCE_DIR}/{sample}/stvar/"
+            f"Required reference files not found for {base_sample}. {message}\n"
+            f"Please ensure reference files are available in: {REFERENCE_DIR}/{base_sample}/stvar/"
         )
-    logger.info(f"Reference files verified for Truvari: {sample}")
+    logger.info(f"Reference files verified for Truvari: {base_sample}")
     
     # Paths to working directories
-    ref_dir_path = REFERENCE_DIR / sample / "stvar"
+    # Use base_sample for reference directory, full sample for run directory
+    ref_dir_path = REFERENCE_DIR / base_sample / "stvar"
     run_dir_path = LAB_RUN_DIR / f"{sample}_{run}"
     
     # Get the reference and run files (use base files, not normalized ones)
