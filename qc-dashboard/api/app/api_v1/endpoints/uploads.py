@@ -240,89 +240,116 @@ def upload_form():
     <html>
     <head>
         <style>
-            body { 
-                font-family: Arial, sans-serif; 
-                margin: 0; 
-                padding: 20px; 
-                background-color: #ffffff;
+            :root {
+                --vc-brand-700: #004a8f;
+                --vc-brand-900: #002a52;
+                --vc-success-500: #2aa36a;
+                --vc-success-700: #1f7a4d;
+                --vc-success-100: #dff3e8;
+                --vc-danger-500: #d23344;
+                --vc-danger-700: #9a1c2a;
+                --vc-danger-100: #fbe2e5;
+                --vc-ink-100: #eef1f5;
+                --vc-ink-500: #57667a;
+                --vc-ink-700: #2c3a4b;
+                --vc-ink-900: #0f1722;
+                --vc-bg: #f6f8fb;
+                --vc-border: #e1e6ee;
+                --vc-r-sm: 4px;
+                --vc-r-md: 8px;
+            }
+            * { box-sizing: border-box; }
+            body {
+                font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+                             Roboto, "Helvetica Neue", Arial, sans-serif;
+                margin: 0;
+                padding: 0;
+                color: var(--vc-ink-900);
+                background: transparent;
+                font-size: 0.95rem;
+                line-height: 1.5;
             }
             .upload-form {
-                max-width: 600px;
+                max-width: 640px;
                 margin: 0 auto;
-                padding: 20px;
-                border: 1px solid #ddd;
-                border-radius: 8px;
-                background-color: #f8f9fa;
+                padding: 0;
             }
-            .form-group {
-                margin-bottom: 20px;
-            }
+            .form-group { margin-bottom: 1.25rem; }
             label {
                 display: block;
-                margin-bottom: 8px;
-                font-weight: bold;
+                margin-bottom: 0.375rem;
+                font-weight: 600;
+                font-size: 0.875rem;
+                color: var(--vc-ink-700);
             }
             input[type="text"], input[type="file"] {
                 width: 100%;
-                padding: 8px;
-                border: 1px solid #ccc;
-                border-radius: 4px;
-                box-sizing: border-box;
+                padding: 0.5rem 0.75rem;
+                border: 1px solid var(--vc-border);
+                border-radius: var(--vc-r-sm);
+                font-size: 0.9375rem;
+                font-family: inherit;
+                background: #ffffff;
+            }
+            input[type="text"]:focus, input[type="file"]:focus {
+                outline: 2px solid var(--vc-brand-700);
+                outline-offset: 1px;
+                border-color: var(--vc-brand-700);
             }
             .checkbox-group {
-                margin-bottom: 15px;
+                margin-bottom: 0.5rem;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
             }
             .checkbox-group label {
-                display: inline;
-                font-weight: normal;
-                margin-left: 8px;
+                margin: 0;
+                font-weight: 400;
+                font-size: 0.9375rem;
+                color: var(--vc-ink-900);
             }
-            .checkbox-group input {
-                width: auto;
-            }
+            .checkbox-group input { width: auto; margin: 0; }
             .upload-button {
-                background-color: #28a745;
-                color: white;
-                padding: 12px 24px;
+                background: var(--vc-success-500);
+                color: #ffffff;
+                padding: 0.625rem 1.125rem;
                 border: none;
-                border-radius: 4px;
+                border-radius: var(--vc-r-sm);
                 cursor: pointer;
-                font-size: 16px;
+                font-size: 0.9375rem;
+                font-weight: 600;
+                font-family: inherit;
+                transition: background-color 0.15s ease;
             }
-            .upload-button:hover {
-                background-color: #218838;
-            }
+            .upload-button:hover { background: var(--vc-success-700); }
             .upload-button:disabled {
-                background-color: #6c757d;
+                background: var(--vc-ink-100);
+                color: var(--vc-ink-500);
                 cursor: not-allowed;
             }
-            .progress {
-                display: none;
-                margin-top: 15px;
-                padding: 15px;
-                background-color: #e9f2fb;
-                border-radius: 4px;
-                color: #0c2d48;
+            .progress, .success, .error {
+                margin-top: 1rem;
+                padding: 0.75rem 1rem;
+                border-radius: var(--vc-r-sm);
+                font-size: 0.9375rem;
+                border: 1px solid transparent;
             }
-            .success {
-                margin-top: 15px;
-                padding: 15px;
-                background-color: #d4edda;
-                border-radius: 4px;
-                color: #155724;
-            }
-            .error {
-                margin-top: 15px;
-                padding: 15px;
-                background-color: #f8d7da;
-                border-radius: 4px;
-                color: #721c24;
+            .progress { display: none; background: #e6eef7; color: var(--vc-brand-900); border-color: var(--vc-brand-700); }
+            .success  { background: var(--vc-success-100); color: var(--vc-success-700); border-color: var(--vc-success-500); }
+            .error    { background: var(--vc-danger-100);  color: var(--vc-danger-700);  border-color: var(--vc-danger-500); }
+            h3 {
+                margin: 0 0 1rem 0;
+                font-size: 1rem;
+                font-weight: 600;
+                color: var(--vc-ink-700);
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
             }
         </style>
     </head>
     <body>
         <div class="upload-form">
-            <h3>Upload Run Data</h3>
+            <h3>New run upload</h3>
             <form id="uploadForm" action="/api/v1/upload/runs" method="post" enctype="multipart/form-data">
                 <div class="form-group">
                     <label for="sample">Sample/Run Name:</label>
