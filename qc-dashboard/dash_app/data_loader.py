@@ -1,10 +1,11 @@
 import pandas as pd
 import requests
 import numpy as np
+
 from .config import API_BASE_URL
 
-# URL complète vers l'API FastAPI exposée
 API_BASE = f"{API_BASE_URL}/dash"
+
 
 def list_files(file_type: str) -> list[str]:
     """
@@ -12,7 +13,7 @@ def list_files(file_type: str) -> list[str]:
     """
     url = f"{API_BASE}/samples/{file_type}"
     try:
-        resp = requests.get(url)
+        resp = requests.get(url, timeout=4)
         resp.raise_for_status()
         return resp.json().get("samples", [])
     except Exception as e:
@@ -27,7 +28,7 @@ def load_data(file_type: str) -> pd.DataFrame:
     """
     url = f"{API_BASE}/data/{file_type}"
     try:
-        resp = requests.get(url)
+        resp = requests.get(url, timeout=4)
         resp.raise_for_status()
         payload = resp.json()
         data = payload["data"]  # Access nested data object
@@ -36,7 +37,6 @@ def load_data(file_type: str) -> pd.DataFrame:
             index=data["metrics"],
             columns=data["samples"],
         )
-        # remplacer inf/-inf par NaN puis laisser Pandas gérer
         df = df.replace([None], np.nan)
         return df
     except Exception as e:

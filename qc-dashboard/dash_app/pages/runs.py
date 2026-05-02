@@ -1,278 +1,310 @@
 from dash import dcc, html, callback, Input, Output, State
 import requests
+
 from ..config import API_BASE_URL
 
 
+def _site_header():
+    return html.Header(
+        [
+            html.Div(
+                [
+                    html.Img(src="/assets/logo_institut.png", alt="IARC"),
+                    html.Div(
+                        [
+                            html.Span("Institut Atlantique de Recherche sur le Cancer",
+                                      className="eyebrow"),
+                            html.Span("VCBench · Pipeline", className="product"),
+                        ],
+                        className="brand-text",
+                    ),
+                ],
+                className="brand",
+            ),
+            html.Nav(
+                [
+                    dcc.Link("Overview", href="/"),
+                    dcc.Link("Pipeline", href="/runs", className="active"),
+                    dcc.Link("Dashboard", href="/home"),
+                    html.A("API", href="/api/docs", target="_blank"),
+                ],
+                className="site-nav",
+            ),
+        ],
+        className="site-header",
+    )
+
+
+def _aws_section():
+    """AWS S3 import block. Pulls a known sample from S3 and runs the pipeline."""
+    return html.Div(
+        [
+            html.H3("Import from AWS S3"),
+            html.P(
+                "Pull a known GIAB sample directly from S3, fetch the matching "
+                "reference truth set, and launch benchmarking in one shot.",
+                style={"color": "var(--vc-ink-500)", "fontSize": "0.95rem",
+                       "marginBottom": "1.25rem"},
+            ),
+            html.Div(
+                [
+                    html.Label(
+                        "Sample ID",
+                        htmlFor="aws-sample-id",
+                        style={"fontWeight": 600, "fontSize": "0.875rem",
+                               "marginBottom": "0.375rem", "display": "block",
+                               "color": "var(--vc-ink-700)"},
+                    ),
+                    dcc.Input(
+                        id="aws-sample-id",
+                        type="text",
+                        placeholder="e.g. NA24143_Lib3_Rep1",
+                        style={
+                            "width": "100%",
+                            "maxWidth": "480px",
+                            "padding": "0.5rem 0.75rem",
+                            "border": "1px solid var(--vc-border)",
+                            "borderRadius": "var(--vc-r-sm)",
+                            "fontSize": "0.9375rem",
+                            "fontFamily": "inherit",
+                            "boxSizing": "border-box",
+                        },
+                    ),
+                ],
+                style={"marginBottom": "1.25rem"},
+            ),
+            html.Div(
+                [
+                    html.Label(
+                        "Benchmarking options",
+                        style={"fontWeight": 600, "fontSize": "0.875rem",
+                               "marginBottom": "0.5rem", "display": "block",
+                               "color": "var(--vc-ink-700)"},
+                    ),
+                    dcc.Checklist(
+                        id="aws-benchmarking-checkboxes",
+                        options=[
+                            {'label': ' hap.py (small variants)', 'value': 'happy'},
+                            {'label': ' stratified (requires hap.py)', 'value': 'stratified'},
+                            {'label': ' truvari (structural variants)', 'value': 'truvari'},
+                            {'label': ' csv (CSV export)', 'value': 'csv'},
+                        ],
+                        value=['csv', 'truvari'],
+                        labelStyle={"display": "block", "margin": "0 0 0.375rem 0",
+                                    "fontSize": "0.9375rem"},
+                    ),
+                ],
+                style={"marginBottom": "1rem"},
+            ),
+            dcc.Checklist(
+                id="aws-auto-process",
+                options=[
+                    {'label': ' Process automatically after download',
+                     'value': 'auto'},
+                ],
+                value=['auto'],
+                labelStyle={"display": "inline-block", "fontSize": "0.9375rem",
+                            "color": "var(--vc-ink-700)"},
+                style={"marginBottom": "1.25rem"},
+            ),
+            html.Button(
+                "Import from AWS",
+                id="aws-import-btn",
+                n_clicks=0,
+                disabled=True,
+                className="btn btn-secondary",
+            ),
+            html.Div(id="aws-status-message", style={"marginTop": "1rem"}),
+            html.Div(
+                [
+                    html.H4(
+                        "Download progress",
+                        style={"marginTop": "1.25rem", "marginBottom": "0.5rem",
+                               "fontSize": "0.875rem", "fontWeight": 600,
+                               "textTransform": "uppercase",
+                               "letterSpacing": "0.04em",
+                               "color": "var(--vc-ink-500)"},
+                    ),
+                    html.Div(
+                        id="aws-logs-console",
+                        style={
+                            "height": "320px",
+                            "overflowY": "auto",
+                            "background": "#1e1e1e",
+                            "color": "#d4d4d4",
+                            "padding": "0.75rem 1rem",
+                            "borderRadius": "var(--vc-r-md)",
+                            "fontFamily": "var(--vc-font-mono)",
+                            "fontSize": "0.8125rem",
+                            "lineHeight": "1.5",
+                            "whiteSpace": "pre-wrap",
+                            "wordWrap": "break-word",
+                        },
+                    ),
+                    dcc.Store(id="log-index-store", data=0),
+                    dcc.Store(id="current-sample-id", data=None),
+                    dcc.Interval(
+                        id="log-poll-interval",
+                        interval=2000,
+                        disabled=True,
+                        n_intervals=0,
+                    ),
+                ],
+                id="aws-logs-container",
+                style={"display": "none"},
+            ),
+        ],
+        className="section-card",
+        style={"marginTop": "1rem"},
+    )
+
+
+def _local_upload_section():
+    """ZIP upload section using the FastAPI streaming endpoint via iframe."""
+    return html.Div(
+        [
+            html.H3("Upload run archive"),
+            html.P(
+                "Upload a ZIP archive of DRAGEN outputs. Large files use the FastAPI "
+                "streaming endpoint to avoid browser timeouts.",
+                style={"color": "var(--vc-ink-500)", "fontSize": "0.95rem",
+                       "marginBottom": "1.25rem"},
+            ),
+            html.Iframe(
+                src="/api/v1/upload/form",
+                style={
+                    "width": "100%",
+                    "height": "640px",
+                    "border": "none",
+                    "background": "transparent",
+                    "display": "block",
+                },
+            ),
+        ],
+        className="section-card",
+        style={"marginTop": "1rem"},
+    )
+
+
+def _upload_tab():
+    return html.Div(
+        [_aws_section(), _local_upload_section()],
+        style={"display": "flex", "flexDirection": "column", "gap": "1rem"},
+    )
+
+
+def _manage_tab():
+    return html.Div(
+        [
+            html.H3("Manage existing runs"),
+            html.P(
+                "Select a run, review what's already benchmarked, and launch the "
+                "remaining tools.",
+                style={"color": "var(--vc-ink-500)", "fontSize": "0.95rem",
+                       "marginBottom": "1.5rem"},
+            ),
+            html.Div(id="alert-message"),
+            html.Div(
+                [
+                    html.Label("Run", htmlFor="run-dropdown",
+                               style={"fontWeight": 600, "fontSize": "0.875rem",
+                                      "marginBottom": "0.5rem", "display": "block",
+                                      "color": "var(--vc-ink-700)"}),
+                    dcc.Dropdown(
+                        id="run-dropdown",
+                        placeholder="Choose a run to manage",
+                        style={"maxWidth": "480px"},
+                    ),
+                ],
+                style={"marginBottom": "1.5rem"},
+            ),
+            html.Div(
+                id="run-details-section",
+                children=[
+                    html.Div(
+                        [
+                            html.H4("Completed benchmarking",
+                                    style={"color": "var(--vc-success-700)"}),
+                            html.Div(id="completed-benchmarking",
+                                     style={"padding": "1rem",
+                                            "background": "var(--vc-success-100)",
+                                            "borderRadius": "var(--vc-r-md)",
+                                            "marginBottom": "1.5rem"}),
+                        ]
+                    ),
+                    html.Div(
+                        [
+                            html.H4("Available benchmarking",
+                                    style={"color": "var(--vc-brand-700)"}),
+                            html.Div(
+                                [
+                                    dcc.Checklist(
+                                        id="benchmarking-checkboxes",
+                                        options=[
+                                            {'label': ' hap.py (small variants)', 'value': 'happy'},
+                                            {'label': ' stratified (requires hap.py)', 'value': 'stratified'},
+                                            {'label': ' truvari (structural variants)', 'value': 'truvari'},
+                                            {'label': ' csv (CSV export)', 'value': 'csv'},
+                                        ],
+                                        value=[],
+                                        labelStyle={"display": "block",
+                                                    "margin": "0 0 0.5rem 0",
+                                                    "fontSize": "0.95rem"},
+                                    ),
+                                    html.Button(
+                                        "Launch selected benchmarking",
+                                        id="launch-benchmarking-btn",
+                                        n_clicks=0,
+                                        disabled=True,
+                                        className="btn btn-success",
+                                        style={"marginTop": "1rem"},
+                                    ),
+                                ],
+                                style={"padding": "1rem",
+                                       "background": "var(--vc-bg)",
+                                       "border": "1px solid var(--vc-border)",
+                                       "borderRadius": "var(--vc-r-md)"},
+                            ),
+                        ]
+                    ),
+                ],
+                style={"display": "none"},
+            ),
+            dcc.Link(
+                html.Button("← Back to overview",
+                            className="btn btn-ghost",
+                            style={"marginTop": "1.5rem"}),
+                href="/",
+            ),
+        ],
+        className="section-card",
+        style={"marginTop": "1rem"},
+    )
+
+
 def create_launch_layout():
-    """Create the launch page layout equivalent to launch.html"""
-    return html.Div([
-        # Header section
-        html.Header([
-            # Left section (image)
-            html.Div([
-                html.Img(
-                    src="/assets/logo_institut.png",
-                    alt="Logo Institut",
-                    style={
-                        "height": "60px",
-                        "background": "#FFFFFF",
-                        "padding": "4px",
-                        "border-radius": "4px",
-                        "box-shadow": "0 2px 6px rgba(0,0,0,0.3)"
-                    }
-                )
-            ], style={"flex": "1"}),  # Takes 1/3 of space
-        
-            # Center section (title)
-            html.Div([
-                html.H1("Run Management", style={
-                    "margin": "0",
-                    "font-size": "1.8rem",
-                    "color": "#FFFFFF",
-                    "text-align": "center"
-                })
-            ], style={"flex": "1"}),  # Takes 1/3 of space
-    
-            # Right section (empty for balance)
-            html.Div(style={"flex": "1"})  # Takes 1/3 of space
-        ], className="site-header", style={
-            "display": "flex", 
-            "align-items": "center", 
-            "height": "100px",
-            "background": "#004A8F",
-            "padding": "0 20px"
-        }),
-        # Tabs for either uploading or managing runs
-        dcc.Tabs(id="main-tabs", value="upload-tab", children=[
-            dcc.Tab(label='Upload Run', value="upload-tab", children=[
-                html.Div([
-                    html.H3("Upload Run Data", style={"margin-bottom": "20px"}),
-                    
-                    # AWS Import Section
-                    html.Div([
-                        html.H4("Import from AWS S3", style={"margin-bottom": "15px", "color": "#004A8F"}),
-                        html.Div([
-                            # Sample ID input
-                            html.Div([
-                                html.Label("Sample ID:", htmlFor="aws-sample-id", style={"font-weight": "bold", "margin-bottom": "8px", "display": "block"}),
-                                dcc.Input(
-                                    id="aws-sample-id",
-                                    type="text",
-                                    placeholder="e.g., NA24143_Lib3_Rep1",
-                                    style={
-                                        "width": "100%",
-                                        "padding": "8px",
-                                        "border": "1px solid #ccc",
-                                        "border-radius": "4px",
-                                        "box-sizing": "border-box"
-                                    }
-                                )
-                            ], style={"margin-bottom": "20px"}),
-                            
-                            # Benchmarking options
-                            html.Div([
-                                html.Label("Select benchmarking options:", style={"font-weight": "bold", "margin-bottom": "8px", "display": "block"}),
-                                dcc.Checklist(
-                                    id="aws-benchmarking-checkboxes",
-                                    options=[
-                                        {'label': ' hap.py (Happy benchmarking)', 'value': 'happy'},
-                                        {'label': ' stratified (requires hap.py)', 'value': 'stratified'},
-                                        {'label': ' truvari (Structural variant benchmarking)', 'value': 'truvari'},
-                                        {'label': ' csv (CSV output formatting)', 'value': 'csv'}
-                                    ],
-                                    value=['csv', 'truvari'],  # Default selections matching FastAPI form
-                                    style={"margin-bottom": "15px"},
-                                    labelStyle={"display": "block", "margin-bottom": "8px"}
-                                )
-                            ], style={"margin-bottom": "20px"}),
-                            
-                            # Auto-process checkbox
-                            html.Div([
-                                dcc.Checklist(
-                                    id="aws-auto-process",
-                                    options=[
-                                        {'label': ' Process automatically after download', 'value': 'auto'}
-                                    ],
-                                    value=['auto'],
-                                    labelStyle={"display": "inline-block"}
-                                )
-                            ], style={"margin-bottom": "20px"}),
-                            
-                            # Launch button
-                            html.Button(
-                                "Import from AWS",
-                                id="aws-import-btn",
-                                n_clicks=0,
-                                disabled=True,
-                                style={
-                                    "padding": "12px 24px",
-                                    "background-color": "#28a745",
-                                    "color": "white",
-                                    "border": "none",
-                                    "border-radius": "6px",
-                                    "cursor": "pointer",
-                                    "font-size": "16px",
-                                    "font-weight": "bold"
-                                }
-                            ),
-                            
-                            # Status message
-                            html.Div(id="aws-status-message", style={"margin-top": "20px"}),
-                            
-                            # Real-time logs console
-                            html.Div([
-                                html.H5("Download Progress:", style={"margin-top": "20px", "margin-bottom": "10px"}),
-                                html.Div(
-                                    id="aws-logs-console",
-                                    style={
-                                        "height": "400px",
-                                        "overflow-y": "auto",
-                                        "background-color": "#1e1e1e",
-                                        "color": "#d4d4d4",
-                                        "padding": "15px",
-                                        "border-radius": "6px",
-                                        "font-family": "Consolas, 'Courier New', monospace",
-                                        "font-size": "13px",
-                                        "line-height": "1.5",
-                                        "white-space": "pre-wrap",
-                                        "word-wrap": "break-word"
-                                    }
-                                ),
-                                # Hidden store to track log index
-                                dcc.Store(id="log-index-store", data=0),
-                                dcc.Store(id="current-sample-id", data=None),
-                                # Interval for polling logs
-                                dcc.Interval(
-                                    id="log-poll-interval",
-                                    interval=2000,  # Poll every 2 seconds
-                                    disabled=True,
-                                    n_intervals=0
-                                )
-                            ], id="aws-logs-container", style={"display": "none", "margin-top": "20px"})
-                            
-                        ], style={
-                            "padding": "20px",
-                            "background-color": "#f8f9fa",
-                            "border": "1px solid #ddd",
-                            "border-radius": "8px"
-                        })
-                    ], style={"margin-bottom": "30px"}),
-                    
-                    # FastAPI Upload Form (embedded via iframe)
-                    html.Div([
-                        html.H4("Upload via FastAPI (Recommended for Large Files)", style={"margin-bottom": "15px", "color": "#004A8F"}),
-                        html.Iframe(
-                            src="/api/v1/upload/form",
-                            style={
-                                "width": "100%",
-                                "height": "600px",
-                                "border": "1px solid #ddd",
-                                "border-radius": "8px"
-                            }
-                        )
-                    ], style={"margin-bottom": "30px"}),
-                ], style={"padding": "20px"})
-            ]),
-            
-            dcc.Tab(label='Manage Runs', value="manage-tab", children=[
-                html.Div([
-                    html.H3("Manage Existing Runs", style={"margin-bottom": "20px"}),
-                    
-                    # Alert messages
-                    html.Div(id="alert-message", style={"margin-bottom": "20px"}),
-
-                    # Run selection section
-                    html.Div([
-                        html.Label("Select Run:", htmlFor="run-dropdown", style={"margin-right": "10px"}),
-                        
-                        dcc.Dropdown(
-                            id="run-dropdown",
-                            placeholder="Choose a run to manage",
-                            style={"width": "400px"}
-                        )
-                    ], style={"margin-bottom": "30px", "display": "flex", "align-items": "center"}),
-
-                    # Run details section (appears when run is selected)
-                    html.Div(id="run-details-section", children=[
-                        # Completed benchmarking status
-                        html.Div([
-                            html.H4("Completed Benchmarking:", style={"margin-bottom": "15px", "color": "#28a745"}),
-                            html.Div(id="completed-benchmarking", style={
-                                "padding": "15px",
-                                "background-color": "#f8f9fa",
-                                "border-radius": "8px",
-                                "margin-bottom": "25px"
-                            })
-                        ]),
-
-                        # Available benchmarking options
-                        html.Div([
-                            html.H4("Available Benchmarking Options:", style={"margin-bottom": "15px", "color": "#007bff"}),
-                            html.Div([
-                                dcc.Checklist(
-                                    id="benchmarking-checkboxes",
-                                    options=[
-                                        {'label': ' hap.py (Happy benchmarking)', 'value': 'happy'},
-                                        {'label': ' stratified (requires hap.py)', 'value': 'stratified'},
-                                        {'label': ' truvari (Structural variant benchmarking)', 'value': 'truvari'},
-                                        {'label': ' csv (CSV output formatting)', 'value': 'csv'}
-                                    ],
-                                    value=[],
-                                    style={"margin-bottom": "20px"},
-                                    labelStyle={"display": "block", "margin-bottom": "8px"}
-                                ),
-                                
-                                html.Button(
-                                    "Launch Selected Benchmarking",
-                                    id="launch-benchmarking-btn",
-                                    n_clicks=0,
-                                    disabled=True,
-                                    style={
-                                        "padding": "12px 24px",
-                                        "background-color": "#28a745",
-                                        "color": "white",
-                                        "border": "none",
-                                        "border-radius": "6px",
-                                        "cursor": "pointer",
-                                        "font-size": "16px",
-                                        "font-weight": "bold"
-                                    }
-                                )
-                            ], style={
-                                "padding": "15px",
-                                "background-color": "#f8f9fa",
-                                "border-radius": "8px",
-                                "margin-bottom": "25px"
-                            })
-                        ])
-                    ], style={"display": "none"}),  # Hidden until run is selected
-
-                    # Back button
-                    html.P([
-                        dcc.Link(
-                            html.Button(
-                                "← Return to index",
-                                type="button",
-                                style={
-                                    "padding": "8px 15px",
-                                    "background-color": "#6c757d",
-                                    "color": "white",
-                                    "border": "none",
-                                    "border-radius": "4px",
-                                    "cursor": "pointer"
-                                }
-                            ),
-                            href="/"
-                        )
-                    ], style={"margin-top": "1.5rem"})
-                ], style={"padding": "20px"})
-            ])
-        ]),
-    ], style={
-        "font-family": "Arial, sans-serif",
-        "min-height": "100vh",
-        "background-color": "#ffffff"
-    })
+    """Pipeline page: upload runs / manage existing runs."""
+    return html.Div(
+        [
+            _site_header(),
+            html.Main(
+                dcc.Tabs(
+                    id="main-tabs",
+                    value="upload-tab",
+                    children=[
+                        dcc.Tab(label='Upload run', value="upload-tab",
+                                children=[_upload_tab()],
+                                className="tab", selected_className="tab--selected"),
+                        dcc.Tab(label='Manage runs', value="manage-tab",
+                                children=[_manage_tab()],
+                                className="tab", selected_className="tab--selected"),
+                    ],
+                ),
+                className="page-section",
+            ),
+        ],
+        style={"minHeight": "100vh", "background": "var(--vc-bg)"},
+    )
 
 
 # Callback to load all runs into dropdown
@@ -285,7 +317,7 @@ def load_all_runs(_):
     print("load_all_runs")
     try:
         # Call your API to get all runs
-        response = requests.get(f"{API_BASE_URL}/runs")
+        response = requests.get(f"{API_BASE_URL}/runs", timeout=4)
         response.raise_for_status()
         runs = response.json()
         
@@ -316,8 +348,7 @@ def update_run_details(selected_run):
         return {"display": "none"}, ""
     
     try:
-        # Get run details from API (you'll need to implement this endpoint)
-        response = requests.get(f"{API_BASE_URL}/runs/{selected_run}/benchmarking")
+        response = requests.get(f"{API_BASE_URL}/runs/{selected_run}/benchmarking", timeout=4)
         if response.status_code == 200:
             run_data = response.json()
             
@@ -377,7 +408,7 @@ def update_benchmarking_options(selected_values, selected_run):
     
     # Get completed benchmarking for the selected run
     try:
-        response = requests.get(f"{API_BASE_URL}/runs/{selected_run}/benchmarking")
+        response = requests.get(f"{API_BASE_URL}/runs/{selected_run}/benchmarking", timeout=4)
         if response.status_code == 200:
             run_data = response.json()
             completed_benchmarking = []
@@ -425,39 +456,17 @@ def update_benchmarking_options(selected_values, selected_run):
     return all_options
 
 
-# Callback to enable/disable launch button based on selections
 @callback(
     [Output("launch-benchmarking-btn", "disabled"),
-     Output("launch-benchmarking-btn", "style")],
+     Output("launch-benchmarking-btn", "className")],
     [Input("benchmarking-checkboxes", "value"),
      Input("run-dropdown", "value")]
 )
 def update_launch_button(selected_benchmarking, selected_run):
-    """Enable launch button only when both run and benchmarking options are selected"""
-    print(f"update_launch_button: run={selected_run}, benchmarking={selected_benchmarking}")
-    
-    base_style = {
-        "padding": "12px 24px",
-        "border": "none",
-        "border-radius": "6px",
-        "font-size": "16px",
-        "font-weight": "bold"
-    }
-    
+    """Enable launch button only when both a run and at least one option are selected."""
     if selected_run and selected_benchmarking:
-        return False, {
-            **base_style,
-            "background-color": "#28a745",
-            "color": "white",
-            "cursor": "pointer"
-        }
-    else:
-        return True, {
-            **base_style,
-            "background-color": "#6c757d",
-            "color": "#adb5bd",
-            "cursor": "not-allowed"
-        }
+        return False, "btn btn-success"
+    return True, "btn btn-secondary"
 
 
 # Callback to handle launch button click
@@ -480,45 +489,26 @@ def launch_benchmarking(n_clicks, selected_run, selected_benchmarking):
             # Call your processing endpoint with benchmarking as query parameter
             response = requests.post(
                 f"{API_BASE_URL}/runs/{selected_run}/benchmarking",
-                params={"benchmarking": benchmarking_str}  # Changed from json to params
+                params={"benchmarking": benchmarking_str},
+                timeout=10,
             )
             
             if response.status_code == 200:
                 benchmarking_list = ', '.join(selected_benchmarking)
                 return html.Div(
-                    f"Successfully launched benchmarking for '{selected_run}': {benchmarking_list}",
-                    style={
-                        "padding": "15px",
-                        "background-color": "#d4edda",
-                        "border": "1px solid #c3e6cb",
-                        "border-radius": "6px",
-                        "color": "#155724"
-                    }
+                    f"Launched benchmarking for '{selected_run}': {benchmarking_list}.",
+                    className="alert alert-success",
                 )
-            else:
-                return html.Div(
-                    f"Error launching benchmarking: {response.text}",
-                    style={
-                        "padding": "15px",
-                        "background-color": "#f8d7da",
-                        "border": "1px solid #f5c6cb",
-                        "border-radius": "6px",
-                        "color": "#721c24"
-                    }
-                )
-                
-        except Exception as e:
             return html.Div(
-                f"Connection error: {str(e)}",
-                style={
-                    "padding": "15px",
-                    "background-color": "#f8d7da",
-                    "border": "1px solid #f5c6cb",
-                    "border-radius": "6px",
-                    "color": "#721c24"
-                }
+                f"API returned {response.status_code}: {response.text[:200]}",
+                className="alert alert-error",
             )
-    
+        except requests.exceptions.RequestException as exc:
+            return html.Div(
+                f"Couldn't reach the API: {exc}",
+                className="alert alert-error",
+            )
+
     return ""
 
 # AWS Import Callbacks -------------------------------------------------------------------------
