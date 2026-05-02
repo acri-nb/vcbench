@@ -4,38 +4,69 @@ import requests
 
 from ..config import API_BASE_URL
 
+
+def _site_header():
+    return html.Header(
+        [
+            html.Div(
+                [
+                    html.Img(src="/assets/logo_institut.png", alt="IARC"),
+                    html.Div(
+                        [
+                            html.Span("Institut Atlantique de Recherche sur le Cancer",
+                                      className="eyebrow"),
+                            html.Span("VCBench · Truvari", className="product"),
+                        ],
+                        className="brand-text",
+                    ),
+                ],
+                className="brand",
+            ),
+            html.Nav(
+                [
+                    dcc.Link("Overview", href="/"),
+                    dcc.Link("Pipeline", href="/runs"),
+                    dcc.Link("Dashboard", href="/home"),
+                    dcc.Link("Truvari", href="/truvari", className="active"),
+                    html.A("API", href="/api/docs", target="_blank"),
+                ],
+                className="site-nav",
+            ),
+        ],
+        className="site-header",
+    )
+
+
 def create_truvari_layout():
     """Create the Truvari benchmarking results page layout"""
     return html.Div([
-        html.H1("Truvari - Structural Variant Benchmarking Results", style={
-            "text-align": "center",
-            "color": "#2c3e50",
-            "margin-bottom": "30px"
-        }),
-        
+        _site_header(),
         html.Div([
-            html.Label("Select Run:", style={"font-weight": "bold", "margin-bottom": "10px"}),
-            dcc.Dropdown(
-                id="truvari-run-dropdown",
-                placeholder="Select a run to view Truvari results...",
-                style={"width": "100%"}
-            )
-        ], style={
-            "max-width": "600px",
-            "margin": "0 auto 30px auto",
-            "padding": "20px",
-            "background": "white",
-            "border-radius": "8px",
-            "box-shadow": "0 2px 4px rgba(0,0,0,0.1)"
-        }),
-        
-        html.Div(id="truvari-results-container")
-        
-    ], style={
-        "padding": "20px",
-        "max-width": "1400px",
-        "margin": "0 auto"
-    })
+            html.H1("Structural variant benchmarking", style={
+                "margin": "var(--vc-s-6) 0 var(--vc-s-2) 0",
+            }),
+            html.P(
+                "Truvari precision, recall, and genotype concordance for runs that "
+                "have completed structural-variant benchmarking.",
+                style={"color": "var(--vc-ink-500)", "fontSize": "0.95rem",
+                       "marginBottom": "var(--vc-s-5)"},
+            ),
+
+            html.Div([
+                html.Label("Select run", htmlFor="truvari-run-dropdown",
+                           style={"fontWeight": 600, "fontSize": "0.875rem",
+                                  "marginBottom": "0.375rem", "display": "block",
+                                  "color": "var(--vc-ink-700)"}),
+                dcc.Dropdown(
+                    id="truvari-run-dropdown",
+                    placeholder="Choose a run with Truvari results…",
+                    style={"width": "100%", "maxWidth": "480px"},
+                ),
+            ], className="section-card", style={"marginBottom": "var(--vc-s-5)"}),
+
+            html.Div(id="truvari-results-container"),
+        ], className="page-section"),
+    ], style={"minHeight": "100vh", "background": "var(--vc-bg)"})
 
 
 @callback(
