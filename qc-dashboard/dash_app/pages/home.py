@@ -3,6 +3,37 @@ from dash import dcc, html
 from dash_app.config import FILE_TYPES
 
 
+def _site_header():
+    return html.Header(
+        [
+            html.Div(
+                [
+                    html.Img(src="/assets/logo_institut.png", alt="IARC"),
+                    html.Div(
+                        [
+                            html.Span("Institut Atlantique de Recherche sur le Cancer",
+                                      className="eyebrow"),
+                            html.Span("VCBench · Dashboard", className="product"),
+                        ],
+                        className="brand-text",
+                    ),
+                ],
+                className="brand",
+            ),
+            html.Nav(
+                [
+                    dcc.Link("Overview", href="/"),
+                    dcc.Link("Pipeline", href="/runs"),
+                    dcc.Link("Dashboard", href="/home", className="active"),
+                    html.A("API", href="/api/docs", target="_blank"),
+                ],
+                className="site-nav",
+            ),
+        ],
+        className="site-header",
+    )
+
+
 # Two- to three-letter mark used in the collapsed sidebar (replaces emoji icons).
 NAV_MARKS = {
     "Summary":             "Sum",
@@ -157,8 +188,14 @@ def _main_content():
 
 
 def build_layout():
-    """Dashboard: left rail (file type), main (tables/plots), right rail (status)."""
+    """Dashboard: header, left rail (file type), main (tables/plots), right rail (status)."""
     return html.Div(
-        [_left_sidebar(), _right_sidebar(), _main_content()],
+        [
+            _site_header(),
+            html.Div(
+                [_left_sidebar(), _right_sidebar(), _main_content()],
+                className="dashboard-shell",
+            ),
+        ],
         style={"minHeight": "100vh", "background": "var(--vc-bg)"},
     )

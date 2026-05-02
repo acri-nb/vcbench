@@ -4,7 +4,7 @@
 
 #sidebar {
   position: fixed;
-  top: 0;
+  top: var(--vc-header-h);
   left: 0;
   bottom: 0;
   width: var(--vc-sidebar-w-collapsed);
@@ -12,7 +12,7 @@
   color: var(--vc-ink-100);
   transition: width 0.18s ease;
   overflow: hidden;
-  z-index: 1000;
+  z-index: 900;
   box-shadow: 1px 0 0 rgba(255,255,255,0.04);
   padding-top: var(--vc-s-3);
 }
@@ -103,7 +103,7 @@
 
 #sidebar-right {
   position: fixed;
-  top: 0;
+  top: var(--vc-header-h);
   right: 0;
   bottom: 0;
   width: var(--vc-sidebar-w-collapsed);
@@ -111,7 +111,7 @@
   color: var(--vc-ink-100);
   transition: width 0.18s ease;
   overflow: hidden;
-  z-index: 1000;
+  z-index: 900;
   box-shadow: -1px 0 0 rgba(255,255,255,0.04);
   display: flex;
   flex-direction: column;
