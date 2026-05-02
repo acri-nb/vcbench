@@ -61,33 +61,46 @@ uvicorn api.app.main:app --reload --host 0.0.0.0 --port 8002
 - RESTful API with OpenAPI documentation
 - PostgreSQL database for persistent storage
 
+## Routes
+
+| Path                    | What it serves                                                   |
+|-------------------------|------------------------------------------------------------------|
+| `/`                     | Overview — recent runs panel and workspace navigation.           |
+| `/home`                 | QC dashboard — multi-sample metric comparison.                   |
+| `/runs`                 | Pipeline — AWS S3 import, ZIP upload, and benchmarking control. |
+| `/truvari`              | Truvari structural-variant dashboard.                            |
+| `/api/v1/*`             | REST API (runs, qc-metrics, happy-metrics, truvari-metrics, uploads, dash). |
+| `/api/v1/upload/form`   | Embeddable upload form (used as an `<iframe>` in `/runs`).       |
+| `/api/docs`             | Interactive OpenAPI documentation.                               |
+
 ## Usage
 
 ### 1. Upload Data
 
-**Option A: Manual Upload**
-- Upload ZIP file containing DRAGEN output via web interface
-- Required files: `*.gvcf.gz`, `*.sv.vcf.gz`, `*_metrics.csv`, `*.md5sum`
+**Option A: AWS S3 import (recommended for GIAB samples)**
+- Open the **Pipeline** page (`/runs`) → "Import from AWS S3" section
+- Provide a sample ID (e.g. `NA24143_Lib3_Rep1`)
+- The system auto-downloads files, fetches matching reference truth sets, and runs benchmarking
 
-**Option B: AWS S3 Import**
-- Use "Import from AWS S3" in Run Management
-- Provide sample ID (e.g., `NA24143_Lib3_Rep1`)
-- System automatically downloads files and sets up references
+**Option B: Manual ZIP upload**
+- Use the "Upload run archive" section on `/runs`
+- Required files inside the ZIP: `*.gvcf.gz`, `*.sv.vcf.gz`, `*_metrics.csv`, `*.md5sum`
 
 ### 2. Run Benchmarking
 
-1. Select run from dropdown
+1. Select a run from the dropdown on the **Manage runs** tab
 2. Choose benchmarking tools:
-   - **hap.py**: Small variants (requires reference truth set)
-   - **Truvari**: Structural variants
-   - **CSV reformat**: Process DRAGEN metrics
-3. Click "Launch Selected Benchmarking"
+   - **hap.py**: small variants (requires reference truth set)
+   - **stratified**: stratified hap.py results (requires hap.py)
+   - **Truvari**: structural variants
+   - **csv**: reformat DRAGEN metrics for the dashboard
+3. Click "Launch selected benchmarking"
 
 ### 3. View Results
 
-- Interactive dashboards show metrics and comparisons
+- Interactive dashboards on `/home` (QC) and `/truvari` (structural variants)
 - Download reports and export data
-- Access via REST API: `/api/v1/runs/{run_name}/happy_metrics` or `/truvari_metrics`
+- Programmatic access: `/api/v1/runs/{run_name}/happy_metrics`, `/api/v1/runs/{run_name}/truvari_metrics`
 
 ## Reference Files
 
@@ -124,30 +137,46 @@ See [data/struct.md](data/struct.md) for complete file structure documentation.
 ```
 vcbench/
 ├── data/
-│   ├── lab_runs/          # Uploaded DRAGEN files
+│   ├── lab_runs/           # Uploaded DRAGEN files
 │   ├── processed/          # Benchmarking results
 │   └── reference/          # Reference genomes & truth sets
 ├── pipeline/               # Bioinformatics scripts (happy.sh, truvari.sh)
-├── qc-dashboard/          # Main application
-│   ├── api/               # FastAPI backend
-│   └── dash_app/          # Dash frontend
-├── script/                # Utility scripts
-│   ├── aws_download_gvcf.sh      # AWS S3 download
-│   └── setup_reference.sh        # Reference setup
-└── docs/                  # Detailed documentation
+├── qc-dashboard/           # Main application
+│   ├── api/                # FastAPI backend
+│   │   ├── app/            # Routers, models, DB, websocket
+│   │   └── tasks/          # Background tasks (upload, process, AWS, references)
+│   ├── dash_app/           # Dash frontend
+│   │   ├── pages/          # index, home, runs, truvari
+│   │   ├── assets/         # Tokens (style.css, bar.css), fonts, logo
+│   │   ├── config.py       # API_BASE_URL + FILE_TYPES
+│   │   ├── data_loader.py  # API client helpers
+│   │   ├── callbacks.py    # Cross-page interactive logic
+│   │   └── visualization.py
+│   ├── migrations/         # SQL migrations + apply_migration.py
+│   └── init_db.py          # Database bootstrap
+├── script/                 # Utility scripts
+│   ├── aws_download_gvcf.sh        # AWS S3 download
+│   └── setup_reference.sh          # Reference setup
+└── docs/                   # Detailed documentation
 ```
 
 ## API Endpoints
 
 ### Run Management
-- `GET /api/v1/runs` - List all runs
-- `POST /api/v1/upload/aws` - Import from AWS S3
-- `POST /api/v1/runs/{run_name}/benchmarking` - Launch benchmarking
+- `GET /api/v1/runs` — list all runs
+- `POST /api/v1/upload/aws` — import from AWS S3
+- `POST /api/v1/runs/{run_name}/benchmarking` — launch benchmarking
+- `GET /api/v1/runs/{run_name}/benchmarking` — completed benchmarking status
 
 ### Metrics
-- `GET /api/v1/runs/{run_name}/happy_metrics` - hap.py results
-- `GET /api/v1/runs/{run_name}/truvari_metrics` - Truvari results
-- `GET /api/v1/qc-metrics` - General QC metrics
+- `GET /api/v1/runs/{run_name}/happy_metrics` — hap.py results
+- `GET /api/v1/runs/{run_name}/truvari_metrics` — Truvari results
+- `GET /api/v1/qc-metrics` — general QC metrics
+- `GET /api/v1/dash/samples/{file_type}` — samples available for a metric category
+- `GET /api/v1/dash/data/{file_type}` — metric values across samples
+
+### Real-time Logs
+- `GET /api/v1/download/logs/{sample_id}` — polled log stream for AWS imports
 
 Full API documentation: http://localhost:8002/docs
 
@@ -155,18 +184,74 @@ Full API documentation: http://localhost:8002/docs
 
 ### Environment Variables
 
+All variables are optional; the defaults match `docker/compose.yaml` and `start_app.sh`. Override only when the defaults don't fit your environment.
+
+| Variable          | Default                                                            | Purpose                                                              |
+|-------------------|--------------------------------------------------------------------|----------------------------------------------------------------------|
+| `DATABASE_URL`    | `postgresql+psycopg2://wgs_user:password@localhost:5433/wgs`       | SQLAlchemy URL used by the API and `init_db.py`.                     |
+| `API_HOST`        | `127.0.0.1`                                                        | Host used to compose `API_BASE_URL` for Dash → FastAPI calls.        |
+| `API_PORT`        | `8002`                                                             | Port used to compose `API_BASE_URL` for Dash → FastAPI calls.        |
+| `LAB_RUNS_DIR`    | `<project>/data/lab_runs`                                          | Raw uploaded run archives.                                           |
+| `PROCESSED_DIR`   | `<project>/data/processed`                                         | Pipeline outputs.                                                    |
+| `REFERENCE_DIR`   | `<project>/data/reference`                                         | Reference genome and truth sets used by hap.py / Truvari.            |
+| `AWS_PROFILE`     | `vitalite`                                                         | AWS CLI profile for the S3 download script.                          |
+
+Example overrides:
+
 ```bash
-export DATABASE_URL="postgresql://wgs_user:password@localhost:5433/wgs"
-export LAB_RUNS_DIR="/path/to/vcbench/data/lab_runs"
-export PROCESSED_DIR="/path/to/vcbench/data/processed"
-export REFERENCE_DIR="/path/to/vcbench/data/reference"
+export DATABASE_URL="postgresql+psycopg2://wgs_user:password@localhost:5433/wgs"
+export API_HOST="127.0.0.1"
+export API_PORT="8002"
 ```
 
 ### Configuration Files
 
-- `qc-dashboard/dash_app/config.py` - Frontend configuration
-- `qc-dashboard/api/app/database.py` - Database settings
-- `docker/compose.yaml` - Docker services
+| File                                       | Purpose                                                  |
+|--------------------------------------------|----------------------------------------------------------|
+| `qc-dashboard/dash_app/config.py`          | Builds `API_BASE_URL` from `API_HOST` / `API_PORT`, plus the file-type mapping. |
+| `qc-dashboard/api/app/database.py`         | Reads `DATABASE_URL`; creates the SQLAlchemy engine.     |
+| `qc-dashboard/dash_app/assets/style.css`   | Design tokens (`:root` block) and base primitives.       |
+| `qc-dashboard/dash_app/assets/bar.css`     | Sidebars and dashboard chrome.                           |
+| `docker/compose.yaml`                      | PostgreSQL, bcftools, MultiQC services.                  |
+| `environment.yml` / `requirements.txt`     | Conda and pip dependency lists.                          |
+
+## Design System
+
+VCBench ships a small, tokenized design system. All colors, spacing, typography, and shadow values are CSS custom properties defined in `qc-dashboard/dash_app/assets/style.css` under a `:root` block. Override or extend by adding rules in the same file rather than introducing inline styles.
+
+### Tokens
+
+| Group        | Variables                                                                 |
+|--------------|---------------------------------------------------------------------------|
+| Brand        | `--vc-brand-{900,700,500,100}`, `--vc-accent-{500,400}`                   |
+| Ink/neutral  | `--vc-ink-{900,700,500,300,100}`, `--vc-bg`, `--vc-surface`, `--vc-border`|
+| Status       | `--vc-success-{700,500,100}`, `--vc-warn-{700,500,100}`, `--vc-danger-{700,500,100}` |
+| Type         | `--vc-font-sans`, `--vc-font-mono`, `--vc-fs-{xs,sm,md,lg,xl,2xl,3xl}`    |
+| Spacing      | `--vc-s-{1,2,3,4,5,6,8}` on a 4 px scale                                  |
+| Radius       | `--vc-r-{sm,md,lg}`                                                       |
+| Shadow       | `--vc-shadow-{sm,md,lg}`                                                  |
+| Layout       | `--vc-header-h`, `--vc-sidebar-w-collapsed`, `--vc-sidebar-w-expanded`, `--vc-content-max` |
+
+### Primitives
+
+| Class            | Purpose                                                          |
+|------------------|------------------------------------------------------------------|
+| `.btn`           | Base button. Combine with `.btn-primary` / `.btn-secondary` / `.btn-success` / `.btn-ghost`. |
+| `.action-card`   | Workspace navigation card (used on `/`).                         |
+| `.runs-panel`    | Bordered surface for the recent-runs table.                      |
+| `.section-card`  | Generic content card with `--vc-shadow-sm` and a subtle border.  |
+| `.pill`          | Status pill: `.is-success`, `.is-warn`, `.is-danger`.            |
+| `.alert`         | Inline alert: `.alert-success`, `.alert-warning`, `.alert-error`.|
+| `.empty-state`   | Calm empty placeholder (no error styling).                       |
+| `.error-state`   | Soft danger-colored placeholder for callback failures.           |
+
+### Accessibility
+
+- Inter system stack with `text-wrap: balance` on headings.
+- All interactive elements expose a `:focus-visible` ring using `--vc-brand-500`.
+- `prefers-reduced-motion: reduce` collapses every transition to ~0 ms.
+- Touch targets follow the 44 px minimum in the responsive breakpoint.
+- Status colors avoid red/green-only encoding; an amber warning tier is provided.
 
 ## Development
 
@@ -191,7 +276,18 @@ flake8 qc-dashboard/
 - **[Environment Setup](ENVIRONMENT_README.md)** - Detailed environment configuration
 - **[AWS Integration](docs/AWS_INTEGRATION_README.md)** - AWS S3 import guide
 
-## Recent Updates
+## Changelog
+
+### May 2026 — UI overhaul
+
+- **Design system**: introduced `:root` design tokens (color, spacing on a 4 px scale, type scale, radius, shadow). See the **Design System** section.
+- **Typography**: replaced the Arial/Times default chain with an Inter system stack.
+- **Primitives**: replaced ad-hoc inline styles with reusable primitives — `.btn`, `.action-card`, `.runs-panel`, `.section-card`, `.pill`, `.alert`, `.empty-state`, `.error-state`.
+- **Landing page (`/`)**: replaced the stock-photo hero and translucent card with a tokenized hero band, a recent-runs panel, and three workspace action cards. Empty / error states render as designed alert blocks instead of raw traceback text.
+- **Dashboard (`/home`)**: shipped with the shared site header so users can navigate back to Overview / Pipeline. Sidebar navigation icons replaced with letter marks (Sum / SV / VC / CNV / ROH / HT / Plo / Bed / Cov / Map). The right rail collapsed state shows a vertical "MANUAL STATUS" marker; the full controls appear on hover.
+- **Pipeline (`/runs`)**: unified header, cleaner tabs, embedded upload form rebuilt with a custom file drop zone and a 2×2 benchmarking option grid. AWS S3 import section restyled with the same tokens.
+- **Resilience**: dash callbacks now timeout after 4 s on reads and 10 s on POST so a stalled API no longer freezes the page.
+- **Responsive**: 900 px breakpoint and `prefers-reduced-motion` support.
 
 ### hap.py Integration
 - ✅ Fixed reference file path resolution (base sample extraction)
@@ -220,4 +316,4 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-**VCBench** - Quality control platform for genomics. Developed with ❤️ for the bioinformatics community.
+**VCBench** — Quality control platform for genomics. Developed for the bioinformatics community at the IARC.
