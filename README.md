@@ -8,7 +8,7 @@
 
 Quality-control platform for whole-genome sequencing (WGS) runs. VCBench ingests DRAGEN outputs, runs hap.py and Truvari benchmarking against GIAB truth sets, and visualises the results in an interactive dashboard.
 
-Built at the [Atlantic Cancer Research Institute (IARC)](https://www.iarc.ca/).
+Built at the [Atlantic Cancer Research Institute (IARC)](https://canceratlantique.ca/en/).
 
 ---
 
