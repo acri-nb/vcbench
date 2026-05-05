@@ -1,144 +1,221 @@
-/* assets/bar.css */
+/* assets/bar.css — sidebars and dashboard chrome */
 
-/* 1) Reset bouton natif */
+/* --- Left sidebar: file-type navigation --- */
+
+#sidebar {
+  position: fixed;
+  top: var(--vc-header-h);
+  left: 0;
+  bottom: 0;
+  width: var(--vc-sidebar-w-collapsed);
+  background: var(--vc-ink-900);
+  color: var(--vc-ink-100);
+  transition: width 0.18s ease;
+  overflow: hidden;
+  z-index: 900;
+  box-shadow: 1px 0 0 rgba(255,255,255,0.04);
+  padding-top: var(--vc-s-3);
+}
+#sidebar:hover { width: var(--vc-sidebar-w-expanded); }
+
 #sidebar .nav-item {
   background: transparent;
   border: none;
   outline: none;
-}
-
-/* 2) Container sidebar gauche */
-#sidebar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  width: 4rem;                 
-  background: #273c4a;         
-  color: #dfe7ec;              
-  transition: width 0.2s ease;
-  overflow: hidden;
-  z-index: 1000;
-  box-shadow: 2px 0 6px rgba(0,0,0,0.3);
-}
-
-/* 3) Ouverture au hover */
-#sidebar:hover {
-  width: 16rem;                
-}
-
-/* 4) Élément nav-item */
-#sidebar .nav-item {
   display: flex;
   align-items: center;
-  padding: 0.75rem 1rem;
-  font-size: 0.95rem;
+  gap: var(--vc-s-3);
+  padding: var(--vc-s-3) var(--vc-s-3);
+  margin: 2px var(--vc-s-2);
+  font-family: inherit;
+  font-size: var(--vc-fs-sm);
+  color: var(--vc-ink-300);
   white-space: nowrap;
-  border-radius: 6px;
-  margin: 6px 8px;
-  transition: background-color 0.2s, padding-left 0.2s;
-  color: inherit;
+  border-radius: var(--vc-r-sm);
+  transition: background-color 0.15s ease, color 0.15s ease;
+  width: calc(100% - var(--vc-s-4));
+  cursor: pointer;
+  text-align: left;
 }
-
-/* 5) Hover nav-item (accent coloré) */
 #sidebar .nav-item:hover {
-  background: rgba(74,144,226,0.2);
-  padding-left: 1.25rem;
+  background: rgba(255,255,255,0.06);
+  color: #ffffff;
+}
+#sidebar .nav-item:focus-visible {
+  outline: 2px solid var(--vc-brand-500);
+  outline-offset: 2px;
 }
 
-/* 6) Icône stylée */
+/* Square chip (was a gradient circle with emoji) */
 #sidebar .icon {
-  width: 1.8rem;
-  height: 1.8rem;
-  background: linear-gradient(135deg, #4a90e2, #50e3c2);
-  border-radius: 0.4rem;
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--vc-r-sm);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--vc-ink-100);
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+#sidebar .nav-item:hover .icon {
+  background: var(--vc-brand-700);
+  border-color: var(--vc-brand-500);
+  color: #ffffff;
+}
+#sidebar .nav-item.active .icon {
+  background: var(--vc-brand-500);
+  border-color: var(--vc-brand-500);
+  color: #ffffff;
+}
+#sidebar .nav-item.active {
+  color: #ffffff;
+  background: rgba(15,108,184,0.12);
+}
+
+#sidebar .label {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+#sidebar:hover .label { opacity: 1; }
+
+/* --- Main content offset so it doesn't sit under the rail --- */
+
+#main-content {
+  margin-left: var(--vc-sidebar-w-collapsed);
+  margin-right: var(--vc-sidebar-w-collapsed);
+  padding: var(--vc-s-6) var(--vc-s-5);
+  transition: margin-left 0.18s ease, margin-right 0.18s ease;
+  max-width: none;
+}
+#sidebar:hover ~ #main-content { margin-left: var(--vc-sidebar-w-expanded); }
+
+/* --- Right sidebar: per-metric manual status --- */
+
+#sidebar-right {
+  position: fixed;
+  top: var(--vc-header-h);
+  right: 0;
+  bottom: 0;
+  width: var(--vc-sidebar-w-collapsed);
+  background: var(--vc-ink-900);
+  color: var(--vc-ink-100);
+  transition: width 0.18s ease;
+  overflow: hidden;
+  z-index: 900;
+  box-shadow: -1px 0 0 rgba(255,255,255,0.04);
+  display: flex;
+  flex-direction: column;
+}
+
+/* When collapsed, show only a vertical 'STATUS' marker and hide everything else.
+   When expanded, show the full panel. */
+#sidebar-right .right-stub {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.1rem;
-  color: #fff;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-  transition: background 0.3s, transform 0.2s;
+  height: 100%;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--vc-ink-300);
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  user-select: none;
 }
 
-#sidebar .nav-item:hover .icon {
-  transform: scale(1.15);
-  background: linear-gradient(135deg, #50e3c2, #4a90e2);
-}
-
-/* 6b) Style actif */
-#sidebar .nav-item.active .icon {
-  background: linear-gradient(135deg, #f5a623, #f8e71c);
-  transform: scale(1.1);
-}
-
-/* 7) Label caché jusqu’au hover */
-#sidebar .label {
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-#sidebar:hover .label {
-  opacity: 1;
-}
-
-/* 8) Décalage du contenu central */
-#main-content {
-  margin-left: 4rem;
-  transition: margin-left 0.2s ease;
-}
-#sidebar:hover ~ #main-content {
-  margin-left: 16rem;
-}
-
-/* 9) Supprimer outline focus */
-#sidebar .nav-item:focus {
-  outline: none;
-}
-
-/* ───── Sidebar droite statuts corrigée ───── */
-#sidebar-right {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 4rem;
-  background: #273c4a;
-  color: #dfe7ec;
-  transition: width 0.2s ease;
-  overflow-x: hidden;
-  overflow-y: hidden;         /* <- désactivé par défaut */
-  max-height: 100vh;          /* <- empêche débordement */
-  z-index: 1000;
-  box-shadow: -2px 0 6px rgba(0,0,0,0.3);
+#sidebar-right .right-panel {
+  display: none;
+  padding: var(--vc-s-5) var(--vc-s-4);
+  overflow-y: auto;
+  height: 100%;
+  flex-direction: column;
+  gap: var(--vc-s-4);
 }
 
 #sidebar-right:hover {
-  width: 16rem;
-  overflow-y: auto;           /* <- activé seulement au hover */
+  width: var(--vc-sidebar-w-expanded);
+}
+#sidebar-right:hover .right-stub { display: none; }
+#sidebar-right:hover .right-panel { display: flex; }
+
+#sidebar-right h2 {
+  margin: 0;
+  font-size: var(--vc-fs-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--vc-ink-300);
+  font-weight: 600;
+  text-align: left;
+}
+#sidebar-right .panel-help {
+  font-size: var(--vc-fs-sm);
+  color: var(--vc-ink-300);
+  line-height: 1.5;
+  margin: 0;
 }
 
-/* Cache les labels tant que sidebar fermée */
-#sidebar-right .status-label {
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  white-space: nowrap;
+#manual-status-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vc-s-3);
 }
-#sidebar-right:hover .status-label {
-  opacity: 1;
+#manual-status-container > div {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: var(--vc-r-sm);
+  padding: var(--vc-s-3);
 }
 
-/* === Couleurs des statuts dans les dropdowns === */
-.status-pass {
-  color: black !important;
+#sidebar-right .save-btn {
+  width: 100%;
+  margin-top: var(--vc-s-2);
 }
-.status-warning {
-  color: #f1c40f !important;
+
+#sidebar-right .save-status-msg {
+  font-size: var(--vc-fs-sm);
+  font-weight: 500;
+  text-align: center;
+  margin-top: var(--vc-s-2);
 }
-.status-fail {
-  color: #e74c3c !important;
-}
+
+/* === status colors (unchanged semantics) === */
+.status-pass    { color: var(--vc-success-500) !important; }
+.status-warning { color: var(--vc-warn-500)    !important; }
+.status-fail    { color: var(--vc-danger-500)  !important; }
 .status-pass:hover,
 .status-warning:hover,
 .status-fail:hover {
   background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* --- Dashboard headings --- */
+#main-content h1 {
+  font-size: var(--vc-fs-2xl);
+  text-align: left;
+  margin-bottom: var(--vc-s-2);
+}
+#main-content .lede {
+  font-size: var(--vc-fs-md);
+  color: var(--vc-ink-500);
+  margin-bottom: var(--vc-s-5);
+}
+
+@media (max-width: 900px) {
+  #sidebar, #sidebar-right { position: relative; width: 100%; height: auto; box-shadow: none; }
+  #sidebar { display: flex; flex-wrap: wrap; padding: var(--vc-s-2); gap: var(--vc-s-1); }
+  #sidebar .nav-item { width: auto; margin: 0; }
+  #sidebar .label { opacity: 1; }
+  #sidebar-right { display: none; }
+  #main-content { margin: 0 !important; padding: var(--vc-s-4); }
 }

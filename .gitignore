@@ -12,3 +12,5 @@ __pycache__/
 data/
 /script/output.txt
 /script/test.sh
+.gstack/
+

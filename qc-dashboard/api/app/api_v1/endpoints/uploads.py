@@ -240,137 +240,261 @@ def upload_form():
     <html>
     <head>
         <style>
-            body { 
-                font-family: Arial, sans-serif; 
-                margin: 0; 
-                padding: 20px; 
-                background-color: #ffffff;
+            :root {
+                --vc-brand-700: #004a8f;
+                --vc-brand-900: #002a52;
+                --vc-success-500: #2aa36a;
+                --vc-success-700: #1f7a4d;
+                --vc-success-100: #dff3e8;
+                --vc-danger-500: #d23344;
+                --vc-danger-700: #9a1c2a;
+                --vc-danger-100: #fbe2e5;
+                --vc-ink-100: #eef1f5;
+                --vc-ink-500: #57667a;
+                --vc-ink-700: #2c3a4b;
+                --vc-ink-900: #0f1722;
+                --vc-bg: #f6f8fb;
+                --vc-border: #e1e6ee;
+                --vc-r-sm: 4px;
+                --vc-r-md: 8px;
             }
-            .upload-form {
-                max-width: 600px;
-                margin: 0 auto;
-                padding: 20px;
-                border: 1px solid #ddd;
-                border-radius: 8px;
-                background-color: #f8f9fa;
+            * { box-sizing: border-box; }
+            html, body {
+                margin: 0;
+                padding: 0;
+                background: transparent;
             }
-            .form-group {
-                margin-bottom: 20px;
+            body {
+                font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+                             Roboto, "Helvetica Neue", Arial, sans-serif;
+                color: var(--vc-ink-900);
+                font-size: 0.9375rem;
+                line-height: 1.5;
+                padding: 0.25rem 0 1rem 0;
             }
-            label {
+            .upload-form { max-width: 640px; margin: 0; padding: 0; }
+            .form-group { margin-bottom: 1.25rem; }
+            .field-label {
                 display: block;
-                margin-bottom: 8px;
-                font-weight: bold;
+                margin-bottom: 0.375rem;
+                font-weight: 500;
+                font-size: 0.8125rem;
+                color: var(--vc-ink-500);
             }
-            input[type="text"], input[type="file"] {
+            .field-help {
+                margin: 0.375rem 0 0 0;
+                font-size: 0.8125rem;
+                color: var(--vc-ink-500);
+            }
+            input[type="text"] {
                 width: 100%;
-                padding: 8px;
-                border: 1px solid #ccc;
-                border-radius: 4px;
-                box-sizing: border-box;
+                padding: 0.5rem 0.75rem;
+                border: 1px solid var(--vc-border);
+                border-radius: var(--vc-r-sm);
+                font-size: 0.9375rem;
+                font-family: inherit;
+                background: #ffffff;
+                color: var(--vc-ink-900);
             }
-            .checkbox-group {
-                margin-bottom: 15px;
+            input[type="text"]::placeholder { color: var(--vc-ink-500); }
+            input[type="text"]:focus {
+                outline: none;
+                border-color: var(--vc-brand-700);
+                box-shadow: 0 0 0 3px rgba(15,108,184,0.15);
             }
-            .checkbox-group label {
-                display: inline;
-                font-weight: normal;
-                margin-left: 8px;
+            /* Custom file input */
+            input[type="file"] {
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                padding: 0;
+                margin: -1px;
+                overflow: hidden;
+                clip: rect(0,0,0,0);
+                border: 0;
             }
-            .checkbox-group input {
-                width: auto;
-            }
-            .upload-button {
-                background-color: #28a745;
-                color: white;
-                padding: 12px 24px;
-                border: none;
-                border-radius: 4px;
+            .file-drop {
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+                padding: 0.625rem 0.75rem;
+                border: 1px dashed var(--vc-border);
+                border-radius: var(--vc-r-sm);
+                background: var(--vc-bg);
                 cursor: pointer;
-                font-size: 16px;
+                transition: border-color 0.15s ease, background 0.15s ease;
             }
-            .upload-button:hover {
-                background-color: #218838;
+            .file-drop:hover {
+                border-color: var(--vc-brand-500);
+                background: #eef4fb;
             }
-            .upload-button:disabled {
-                background-color: #6c757d;
+            .file-drop:focus-within {
+                border-color: var(--vc-brand-700);
+                box-shadow: 0 0 0 3px rgba(15,108,184,0.15);
+            }
+            .file-drop .pick {
+                display: inline-block;
+                padding: 0.375rem 0.75rem;
+                background: var(--vc-surface, #ffffff);
+                border: 1px solid var(--vc-border);
+                border-radius: var(--vc-r-sm);
+                font-size: 0.8125rem;
+                font-weight: 600;
+                color: var(--vc-ink-700);
+                white-space: nowrap;
+            }
+            .file-drop .file-name {
+                font-size: 0.875rem;
+                color: var(--vc-ink-500);
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            .file-drop.has-file .file-name { color: var(--vc-ink-900); }
+            /* Checkbox grid */
+            .check-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 0.5rem 1rem;
+            }
+            .check-grid label {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                padding: 0.5rem 0.75rem;
+                border: 1px solid var(--vc-border);
+                border-radius: var(--vc-r-sm);
+                background: #ffffff;
+                cursor: pointer;
+                transition: border-color 0.15s ease, background 0.15s ease;
+                font-size: 0.875rem;
+            }
+            .check-grid label:has(input:checked) {
+                border-color: var(--vc-brand-500);
+                background: #eef4fb;
+            }
+            .check-grid label:has(input:disabled) {
+                opacity: 0.5;
                 cursor: not-allowed;
             }
-            .progress {
-                display: none;
-                margin-top: 15px;
-                padding: 15px;
-                background-color: #e9f2fb;
-                border-radius: 4px;
-                color: #0c2d48;
+            .check-grid input { margin: 0; }
+            .check-grid .opt-meta {
+                display: block;
+                font-size: 0.75rem;
+                color: var(--vc-ink-500);
+                margin-top: 0.125rem;
             }
-            .success {
-                margin-top: 15px;
-                padding: 15px;
-                background-color: #d4edda;
-                border-radius: 4px;
-                color: #155724;
+            /* Auto-process toggle row */
+            .toggle-row {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                padding: 0.5rem 0;
+                font-size: 0.875rem;
+                color: var(--vc-ink-700);
             }
-            .error {
-                margin-top: 15px;
-                padding: 15px;
-                background-color: #f8d7da;
-                border-radius: 4px;
-                color: #721c24;
+            .upload-button {
+                background: var(--vc-success-500);
+                color: #ffffff;
+                padding: 0.625rem 1.125rem;
+                border: none;
+                border-radius: var(--vc-r-sm);
+                cursor: pointer;
+                font-size: 0.9375rem;
+                font-weight: 600;
+                font-family: inherit;
+                transition: background-color 0.15s ease;
+            }
+            .upload-button:hover { background: var(--vc-success-700); }
+            .upload-button:disabled {
+                background: var(--vc-ink-100);
+                color: var(--vc-ink-500);
+                cursor: not-allowed;
+            }
+            .progress, .success, .error {
+                margin-top: 1rem;
+                padding: 0.75rem 1rem;
+                border-radius: var(--vc-r-sm);
+                font-size: 0.875rem;
+                border: 1px solid transparent;
+            }
+            .progress { display: none; background: #e6eef7; color: var(--vc-brand-900); border-color: var(--vc-brand-700); }
+            .success  { background: var(--vc-success-100); color: var(--vc-success-700); border-color: var(--vc-success-500); }
+            .error    { background: var(--vc-danger-100);  color: var(--vc-danger-700);  border-color: var(--vc-danger-500); }
+            .progress h4, .success h4, .error h4 {
+                margin: 0 0 0.25rem 0;
+                font-size: 0.875rem;
+                font-weight: 600;
+            }
+            .progress p, .success p, .error p { margin: 0.125rem 0; }
+            @media (max-width: 600px) {
+                .check-grid { grid-template-columns: 1fr; }
             }
         </style>
     </head>
     <body>
         <div class="upload-form">
-            <h3>Upload Run Data</h3>
             <form id="uploadForm" action="/api/v1/upload/runs" method="post" enctype="multipart/form-data">
                 <div class="form-group">
-                    <label for="sample">Sample/Run Name:</label>
-                    <input type="text" id="sample" name="sample" required placeholder="Enter sample name">
+                    <label for="sample" class="field-label">Sample / run name</label>
+                    <input type="text" id="sample" name="sample" required placeholder="e.g. NA12878-2024-01-15">
                 </div>
-                
+
                 <div class="form-group">
-                    <label for="file">Select ZIP file containing run data:</label>
-                    <input type="file" id="file" name="file" accept=".zip" required>
+                    <label for="file" class="field-label">Run archive (ZIP)</label>
+                    <label class="file-drop" id="fileDrop">
+                        <span class="pick">Choose file</span>
+                        <span class="file-name" id="fileName">No file selected</span>
+                        <input type="file" id="file" name="file" accept=".zip" required>
+                    </label>
+                    <p class="field-help">DRAGEN outputs packaged as a single .zip.</p>
                 </div>
-                
+
                 <div class="form-group">
-                    <label>Select benchmarking options:</label>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="happy" name="benchmarking" value="happy">
-                        <label for="happy">hap.py (Happy benchmarking)</label>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="stratified" name="benchmarking" value="stratified" disabled>
-                        <label for="stratified">stratified (requires hap.py)</label>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="csv" name="benchmarking" value="csv" checked>
-                        <label for="csv">csv (CSV output)</label>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="truvari" name="benchmarking" value="truvari" checked>
-                        <label for="truvari">truvari (Truvari)</label>
+                    <span class="field-label">Benchmarking options</span>
+                    <div class="check-grid">
+                        <label><input type="checkbox" id="happy" name="benchmarking" value="happy">
+                            <span>hap.py<span class="opt-meta">Small variants</span></span></label>
+                        <label><input type="checkbox" id="stratified" name="benchmarking" value="stratified" disabled>
+                            <span>Stratified<span class="opt-meta">Requires hap.py</span></span></label>
+                        <label><input type="checkbox" id="csv" name="benchmarking" value="csv" checked>
+                            <span>CSV export<span class="opt-meta">Reformat outputs</span></span></label>
+                        <label><input type="checkbox" id="truvari" name="benchmarking" value="truvari" checked>
+                            <span>Truvari<span class="opt-meta">Structural variants</span></span></label>
                     </div>
                 </div>
-                
-                <div class="checkbox-group">
+
+                <label class="toggle-row">
                     <input type="checkbox" id="auto_process" name="auto_process" value="1" checked>
-                    <label for="auto_process">Process automatically after upload</label>
-                </div>
-                
-                <button type="submit" class="upload-button">Upload and Process Run</button>
+                    <span>Run benchmarking automatically once the upload finishes</span>
+                </label>
+
+                <button type="submit" class="upload-button" style="margin-top: 0.75rem;">Upload and process run</button>
             </form>
-            
+
             <div id="progress" class="progress">
-                <h4>📤 Upload in progress...</h4>
-                <p>Please wait while your file is being uploaded...</p>
+                <h4>Uploading…</h4>
+                <p>Hold tight while the archive transfers.</p>
             </div>
-            
+
             <div id="result"></div>
         </div>
         
         <script>
+            // File-drop label keeps the chosen file name visible.
+            document.getElementById('file').addEventListener('change', function() {
+                const drop = document.getElementById('fileDrop');
+                const nameEl = document.getElementById('fileName');
+                const f = this.files && this.files[0];
+                if (f) {
+                    nameEl.textContent = f.name;
+                    drop.classList.add('has-file');
+                } else {
+                    nameEl.textContent = 'No file selected';
+                    drop.classList.remove('has-file');
+                }
+            });
+
             // Enable/disable stratified option based on happy selection
             document.getElementById('happy').addEventListener('change', function() {
                 const stratified = document.getElementById('stratified');
@@ -419,10 +543,10 @@ def upload_form():
                     if (response.ok) {
                         result.innerHTML = `
                             <div class="success">
-                                <h4>Upload Successful!</h4>
-                                <p><strong>Run Name:</strong> ${data.run_name}</p>
-                                <p><strong>Auto Process:</strong> ${data.auto_process ? 'Yes' : 'No'}</p>
-                                <p><strong>Benchmarking:</strong> ${data.benchmarking || 'None'}</p>
+                                <h4>Upload complete.</h4>
+                                <p>Run: <strong>${data.run_name}</strong></p>
+                                <p>Auto-process: ${data.auto_process ? 'enabled' : 'disabled'}</p>
+                                <p>Benchmarking: ${data.benchmarking || 'none'}</p>
                             </div>
                         `;
                     } else {
@@ -431,8 +555,8 @@ def upload_form():
                 } catch (error) {
                     result.innerHTML = `
                         <div class="error">
-                            <h4>❌ Upload Failed</h4>
-                            <p><strong>Error:</strong> ${error.message}</p>
+                            <h4>Upload failed.</h4>
+                            <p>${error.message}</p>
                         </div>
                     `;
                 }
