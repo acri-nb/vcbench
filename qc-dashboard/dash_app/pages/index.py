@@ -51,6 +51,7 @@ def _site_header():
                     dcc.Link("Overview", href="/", className="active"),
                     dcc.Link("Pipeline", href="/runs"),
                     dcc.Link("Dashboard", href="/home"),
+                    dcc.Link("Truvari", href="/truvari"),
                     html.A("API", href="/api/docs", target="_blank"),
                 ],
                 className="site-nav",
