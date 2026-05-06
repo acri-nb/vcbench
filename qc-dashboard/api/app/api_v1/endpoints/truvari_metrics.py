@@ -4,6 +4,7 @@ from typing import List
 
 from api.app import schemas, crud
 from api.app.database import get_db
+from api.app.security import Role, require_role
 
 router = APIRouter()
 
@@ -11,13 +12,16 @@ router = APIRouter()
 def store_truvari_metrics(
     run_name: str,
     data: schemas.TruvariMetricCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _role: Role = Depends(require_role(Role.OPERATOR)),
 ):
     """Store Truvari benchmarking metrics for a run."""
     # Verify the run exists
     lab_run = crud.get_lab_run_by_name(db, run_name)
     if not lab_run:
         raise HTTPException(status_code=404, detail=f"Run {run_name} not found")
+    if data.run_id != lab_run.id:
+        raise HTTPException(status_code=400, detail="Payload run_id does not match run_name")
     
     # Create metric
     try:
@@ -42,4 +46,3 @@ def get_all_truvari_metrics(run_id: int, db: Session = Depends(get_db)):
     """Get all Truvari metrics for a specific run ID."""
     metrics = crud.get_truvari_metrics(db, run_id)
     return metrics
-

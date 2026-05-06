@@ -1,15 +1,21 @@
 from sqlalchemy.orm import Session
 from typing import Optional
+from datetime import datetime
 
 from api.app import models
 from api.app import schemas
+from api.app.security import hash_password
 
 # Users
 
 def create_user(db: Session, user: schemas.UserCreate) -> models.User:
     """Create a new user in the database."""
     try:
-        db_user = models.User(**user.model_dump())
+        db_user = models.User(
+            username=user.username,
+            full_name=user.full_name,
+            hashed_password=hash_password(user.password),
+        )
         db.add(db_user)
         db.commit()
         db.refresh(db_user)
@@ -49,7 +55,7 @@ def create_lab_run(db: Session, lab_run: schemas.LabRunCreate) -> models.LabRun:
 
 def get_lab_runs(db: Session) -> list[models.LabRun]:
     """Get all lab runs."""
-    return db.query(models.LabRun).all()
+    return db.query(models.LabRun).order_by(models.LabRun.created_at.desc()).all()
 
 def get_lab_run(db: Session, run_id: int) -> Optional[models.LabRun]:
     """Get a lab run by ID."""
@@ -68,14 +74,49 @@ def delete_lab_run(db: Session, run_id: int) -> bool:
         return True
     return False
 
-def update_lab_run_status(db: Session, run_id: int, status: models.RunStatus) -> Optional[models.LabRun]:
+def update_lab_run_status(
+    db: Session,
+    run_id: int,
+    status: models.RunStatus,
+    error_message: Optional[str] = None,
+) -> Optional[models.LabRun]:
     """Update the status of a lab run."""
     lab_run = db.query(models.LabRun).filter(models.LabRun.id == run_id).first()
     if lab_run:
-        lab_run.status = status
-        db.commit()
-        db.refresh(lab_run)
-        return lab_run
+        try:
+            lab_run.status = status
+            lab_run.error_message = error_message
+            now = datetime.utcnow()
+            if status == models.RunStatus.PROCESSING:
+                lab_run.processing_started_at = now
+            if status in {
+                models.RunStatus.AWAITING_APPROVAL,
+                models.RunStatus.APPROVED,
+                models.RunStatus.FAILED,
+            }:
+                lab_run.processing_completed_at = now
+            if status == models.RunStatus.APPROVED:
+                lab_run.approved_at = now
+            db.commit()
+            db.refresh(lab_run)
+            return lab_run
+        except Exception:
+            db.rollback()
+            raise
+    return None
+
+
+def update_lab_run_name(db: Session, run_id: int, run_name: str) -> Optional[models.LabRun]:
+    lab_run = db.query(models.LabRun).filter(models.LabRun.id == run_id).first()
+    if lab_run:
+        try:
+            lab_run.run_name = run_name
+            db.commit()
+            db.refresh(lab_run)
+            return lab_run
+        except Exception:
+            db.rollback()
+            raise
     return None
 
 # QC Metrics
@@ -100,6 +141,14 @@ def create_qc_metric(db: Session, qc_metric: schemas.QCMetricCreate) -> models.Q
 def get_qc_metrics(db: Session, run_id: int) -> list[models.QCMetric]:
     """Get all QC metrics for a run."""
     return db.query(models.QCMetric).filter(models.QCMetric.run_id == run_id).all()
+
+
+def get_qc_metric_by_name(db: Session, run_id: int, metric_name: str) -> Optional[models.QCMetric]:
+    return (
+        db.query(models.QCMetric)
+        .filter(models.QCMetric.run_id == run_id, models.QCMetric.metric_name == metric_name)
+        .first()
+    )
 
 def delete_qc_metric(db: Session, metric_id: int) -> bool:
     """Delete a QC metric by ID. Returns True if deleted, False if not found."""
@@ -157,12 +206,26 @@ def delete_happy_metric(db: Session, metric_id: int) -> bool:
         return True
     return False
 
+
 # Truvari Metrics
 
 def create_truvari_metric(db: Session, truvari_metric: schemas.TruvariMetricCreate) -> models.TruvariMetric:
-    """Create a new Truvari metric."""
+    """Create or replace the Truvari metric row for a run."""
     try:
-        db_truvari_metric = models.TruvariMetric(**truvari_metric.model_dump())
+        existing = (
+            db.query(models.TruvariMetric)
+            .filter(models.TruvariMetric.run_id == truvari_metric.run_id)
+            .first()
+        )
+        values = truvari_metric.model_dump()
+        if existing:
+            for field, value in values.items():
+                setattr(existing, field, value)
+            db.commit()
+            db.refresh(existing)
+            return existing
+
+        db_truvari_metric = models.TruvariMetric(**values)
         db.add(db_truvari_metric)
         db.commit()
         db.refresh(db_truvari_metric)
@@ -171,9 +234,11 @@ def create_truvari_metric(db: Session, truvari_metric: schemas.TruvariMetricCrea
         db.rollback()
         raise e
 
+
 def get_truvari_metrics(db: Session, run_id: int) -> list[models.TruvariMetric]:
     """Get all Truvari metrics for a run."""
     return db.query(models.TruvariMetric).filter(models.TruvariMetric.run_id == run_id).all()
+
 
 def get_truvari_metric_by_run_name(db: Session, run_name: str) -> Optional[models.TruvariMetric]:
     """Get Truvari metric by run name."""
@@ -181,6 +246,7 @@ def get_truvari_metric_by_run_name(db: Session, run_name: str) -> Optional[model
     if not lab_run:
         return None
     return db.query(models.TruvariMetric).filter(models.TruvariMetric.run_id == lab_run.id).first()
+
 
 def delete_truvari_metric(db: Session, metric_id: int) -> bool:
     """Delete a Truvari metric by ID. Returns True if deleted, False if not found."""

@@ -7,6 +7,9 @@ set -e  # Exit on any error
 
 echo "🚀 Setting up VCBench development environment..."
 
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_DIR="$PROJECT_ROOT/.venv"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -37,38 +40,26 @@ if ! command -v conda &> /dev/null; then
     exit 1
 fi
 
-# Create conda environment
-print_info "Creating conda environment 'bioinfo'..."
-conda create -n bioinfo python=3.9 -y
-print_status "Conda environment created"
+# Create local conda environment
+if [[ -x "$ENV_DIR/bin/python" ]]; then
+    print_status "Local Python environment already exists at .venv"
+else
+    print_info "Creating local Python environment at .venv..."
+    conda create -p "$ENV_DIR" python=3.11 pip -y
+    print_status "Local Python environment created"
+fi
 
 # Activate environment
 print_info "Activating conda environment..."
 eval "$(conda shell.bash hook)"
-conda activate bioinfo
+conda activate "$ENV_DIR"
 print_status "Environment activated"
 
-# Install conda packages
-print_info "Installing conda packages..."
-conda install -c conda-forge -c bioconda -c defaults -y \
-    fastapi \
-    uvicorn \
-    sqlalchemy \
-    psycopg2-binary \
-    pandas \
-    numpy \
-    plotly \
-    dash \
-    python-multipart \
-    aiofiles \
-    pydantic
-print_status "Conda packages installed"
-
 # Install pip packages
-print_info "Installing pip packages..."
-pip install --upgrade pip
-pip install -r requirements.txt
-print_status "Pip packages installed"
+print_info "Installing Python packages..."
+python -m pip install --upgrade pip
+python -m pip install -r "$PROJECT_ROOT/requirements.txt"
+print_status "Python packages installed"
 
 # Install bcftools via homebrew (if on macOS)
 if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -85,20 +76,18 @@ fi
 
 # Setup Docker services
 print_info "Setting up Docker services..."
-if command -v docker &> /dev/null && command -v docker-compose &> /dev/null; then
-    cd docker
-    docker-compose up -d
-    cd ..
-    print_status "Docker services started"
+if command -v docker &> /dev/null && docker compose version &> /dev/null; then
+    docker compose -f "$PROJECT_ROOT/docker/compose.yaml" up -d db
+    print_status "PostgreSQL service started"
 else
-    print_warning "Docker or docker-compose not found. Please start services manually."
+    print_warning "Docker Compose not found. Please start services manually."
 fi
 
 # Create necessary directories
 print_info "Creating project directories..."
-mkdir -p data/lab_runs
-mkdir -p data/processed
-mkdir -p data/reference
+mkdir -p "$PROJECT_ROOT/data/lab_runs"
+mkdir -p "$PROJECT_ROOT/data/processed"
+mkdir -p "$PROJECT_ROOT/data/reference"
 print_status "Directories created"
 
 # Initialize database (optional)
@@ -106,8 +95,8 @@ print_info "Database initialization..."
 read -p "Do you want to initialize the database? (y/N): " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    cd qc-dashboard/api/app/test
-    python create_tables.py
+    cd "$PROJECT_ROOT/qc-dashboard"
+    python create_db_tables.py
     print_status "Database initialized"
 else
     print_warning "Database initialization skipped. Run manually when ready."
@@ -117,7 +106,7 @@ fi
 print_status "Environment setup completed!"
 echo ""
 print_info "To activate the environment in future sessions:"
-echo "  conda activate bioinfo"
+echo "  conda activate \"$ENV_DIR\""
 echo ""
 print_info "To start the application:"
 echo "  cd qc-dashboard && ./start_app.sh"

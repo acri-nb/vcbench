@@ -9,16 +9,18 @@ This module handles:
 
 import subprocess
 from pathlib import Path
-from typing import Tuple, Optional, Dict, List
+from typing import Any, Tuple, Optional, Dict, List
 import logging
+
+from api.app import settings
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Project paths
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-REFERENCE_DIR = PROJECT_ROOT / 'data' / 'reference'
+PROJECT_ROOT = settings.PROJECT_ROOT
+REFERENCE_DIR = settings.REFERENCE_DIR
 SETUP_SCRIPT = PROJECT_ROOT / 'script' / 'setup_reference.sh'
 
 # Known GIAB samples mapping
@@ -176,7 +178,7 @@ def check_sample_reference(sample_name: str) -> Tuple[bool, List[str]]:
     return len(required_missing) == 0, missing
 
 
-def check_references(sample_name: str) -> Dict[str, any]:
+def check_references(sample_name: str) -> Dict[str, Any]:
     """
     Comprehensive check of all required reference files.
     
@@ -313,7 +315,7 @@ def ensure_references(sample_name: str, auto_download: bool = True) -> Tuple[boo
         return False, message
 
 
-def get_reference_status(sample_name: str) -> Dict[str, any]:
+def get_reference_status(sample_name: str) -> Dict[str, Any]:
     """
     Get detailed status of reference files for a sample.
     
@@ -404,4 +406,3 @@ if __name__ == '__main__':
     else:
         print(f"Unknown action: {action}")
         sys.exit(1)
-
