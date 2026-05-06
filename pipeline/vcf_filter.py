@@ -1,63 +1,79 @@
-import os
-import subprocess
 import csv
+import re
+import subprocess
+from pathlib import Path
 
-PROCESSED_DIR = "../data/processed/"
+PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"
 VARIANT_TYPES = ["snp", "mnp", "ins", "del", "indel", "sym"]
 VCFEVAL_FILES = ["tp", "fp", "fn"]
 
-output_path = os.path.join(PROCESSED_DIR, "variant_summary.tsv")
+output_path = PROCESSED_DIR / "variant_summary.tsv"
 header = ["Sample", "TP", "FP", "FN", "Precision", "Sensitivity", "F1"]
 
+
 def count_variants_by_type(vcf_path, vtype):
-    if not os.path.exists(vcf_path):
+    if not vcf_path.exists():
         return 0
-    # Try to annotate TYPE if missing
-    cmd = f'bcftools query -f "%TYPE\\n" {vcf_path} | grep -w "{vtype}" | wc -l'
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+
     try:
-        return int(result.stdout.strip())
-    except ValueError:
+        result = subprocess.run(
+            ["bcftools", "query", "-f", "%TYPE\\n", str(vcf_path)],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
         return 0
 
-with open(output_path, "w", newline="") as outfile:
-    writer = csv.writer(outfile, delimiter='\t')
-    writer.writerow(header)
+    if result.returncode != 0:
+        return 0
 
-    for sample_dir in os.listdir(PROCESSED_DIR):
-        full_dir = os.path.join(PROCESSED_DIR, sample_dir)
-        if not os.path.isdir(full_dir):
-            continue
+    pattern = re.compile(rf"\b{re.escape(vtype)}\b")
+    return sum(1 for line in result.stdout.splitlines() if pattern.search(line))
 
-        sample_name = sample_dir
-        total = {"tp": 0, "fp": 0, "fn": 0}
 
-        for eval_type in VCFEVAL_FILES:
-            # Try both .vcf.gz and .vcf
-            vcf_path_gz = os.path.join(full_dir, f"{eval_type}.vcf.gz")
-            vcf_path = os.path.join(full_dir, f"{eval_type}.vcf")
-            vcf_file = vcf_path_gz if os.path.exists(vcf_path_gz) else vcf_path if os.path.exists(vcf_path) else None
-            if not vcf_file:
+def main():
+    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+
+    with open(output_path, "w", newline="") as outfile:
+        writer = csv.writer(outfile, delimiter='\t')
+        writer.writerow(header)
+
+        for sample_dir in PROCESSED_DIR.iterdir():
+            if not sample_dir.is_dir():
                 continue
 
-            for vtype in VARIANT_TYPES:
-                count = count_variants_by_type(vcf_file, vtype)
-                total[eval_type] += count
+            sample_name = sample_dir.name
+            total = {"tp": 0, "fp": 0, "fn": 0}
 
-        tp = total["tp"]
-        fp = total["fp"]
-        fn = total["fn"]
+            for eval_type in VCFEVAL_FILES:
+                vcf_path_gz = sample_dir / f"{eval_type}.vcf.gz"
+                vcf_path = sample_dir / f"{eval_type}.vcf"
+                vcf_file = vcf_path_gz if vcf_path_gz.exists() else vcf_path if vcf_path.exists() else None
+                if not vcf_file:
+                    continue
 
-        precision = tp / (tp + fp) if (tp + fp) > 0 else 0
-        sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0
-        f1 = 2 * precision * sensitivity / (precision + sensitivity) if (precision + sensitivity) > 0 else 0
+                for vtype in VARIANT_TYPES:
+                    count = count_variants_by_type(vcf_file, vtype)
+                    total[eval_type] += count
 
-        writer.writerow([
-            sample_name, tp, fp, fn,
-            round(precision, 4),
-            round(sensitivity, 4),
-            round(f1, 4)
-        ])
+            tp = total["tp"]
+            fp = total["fp"]
+            fn = total["fn"]
 
-print(f"✅ Summary saved to: {output_path}")
+            precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+            sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0
+            f1 = 2 * precision * sensitivity / (precision + sensitivity) if (precision + sensitivity) > 0 else 0
 
+            writer.writerow([
+                sample_name, tp, fp, fn,
+                round(precision, 4),
+                round(sensitivity, 4),
+                round(f1, 4)
+            ])
+
+    print(f"Summary saved to: {output_path}")
+
+
+if __name__ == "__main__":
+    main()

@@ -23,7 +23,7 @@ NAV_ACTIONS = [
         "label": "Reference",
         "title": "API Documentation",
         "desc": "Inspect REST endpoints, schemas, and OpenAPI definitions.",
-        "href": "/api/docs",
+        "href": "/docs",
         "external": True,
     },
 ]
@@ -52,7 +52,7 @@ def _site_header():
                     dcc.Link("Pipeline", href="/runs"),
                     dcc.Link("Dashboard", href="/home"),
                     dcc.Link("Truvari", href="/truvari"),
-                    html.A("API", href="/api/docs", target="_blank"),
+                    html.A("API", href="/docs", target="_blank"),
                 ],
                 className="site-nav",
             ),
