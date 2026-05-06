@@ -1,12 +1,11 @@
 import os
 import subprocess
-import requests
 from pathlib import Path
 import argparse
-import subprocess
 import logging
 
-from api.app import schemas
+from api.app import crud, schemas, settings
+from api.app.database import SessionLocal
 from api.tasks.parsers import reformat_csv, parse_summary, parse_truvari_summary
 from api.tasks import utils
 from api.tasks.setup_reference import ensure_references
@@ -15,10 +14,10 @@ from api.tasks.setup_reference import ensure_references
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-LAB_RUN_DIR = PROJECT_ROOT / 'data' / 'lab_runs'
-PROCESSED_DIR = PROJECT_ROOT / 'data' / 'processed'
-REFERENCE_DIR = PROJECT_ROOT / 'data' / 'reference'
+PROJECT_ROOT = settings.PROJECT_ROOT
+LAB_RUN_DIR = settings.LAB_RUNS_DIR
+PROCESSED_DIR = settings.PROCESSED_DIR
+REFERENCE_DIR = settings.REFERENCE_DIR
 
 # Main wrapper function to run the processing script
 def main():
@@ -305,7 +304,7 @@ def process_happy(sample, run, stratified=False):
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"hap.py failed for {run} with error: {e}")
     # Store summary data in db
-    #post_happy_metrics(sample, run, out_dir_path)
+    post_happy_metrics(sample, run, out_dir_path)
 
 def post_happy_metrics(sample, run, out_dir_path):
     # Search for summary file
@@ -348,7 +347,7 @@ def post_happy_metrics(sample, run, out_dir_path):
         if schema_key in ["type", "filter"]:
             metric_data[schema_key] = val
         elif val is None or val == "":
-            metric_data[schema_key] = None
+            metric_data[schema_key] = 0
         elif schema_key in [
             "truth_total", "truth_tp", "truth_fn", "query_total", "query_fp", "query_unk"
         ]:
@@ -358,19 +357,16 @@ def post_happy_metrics(sample, run, out_dir_path):
     metric_data["run_id"] = run_id
     # Validate and send
     try:
-        print("Validating metric data") #debug ************
         validated_metrics = schemas.HappyMetricCreate(**metric_data)
-        print("Posting happy metric") #debug ************
-        response = requests.post(
-            f"http://localhost:8002/api/v1/runs/{run_name}/happy_metrics",
-            json=validated_metrics.model_dump()
-        )
-        response.raise_for_status()
+        db = SessionLocal()
+        try:
+            crud.create_happy_metric(db, validated_metrics)
+        finally:
+            db.close()
         print(f"Successfully posted happy metric for {run_name}.")
     except Exception as e:
         print(f"Validation error: {e}")
-        if hasattr(e, 'response') and e.response is not None:
-            print("Response content:", e.response.text)
+        raise
     
 def process_truvari(sample, run):
     # Extract base sample name (e.g., NA24143_Lib3_Rep1 -> NA24143)
@@ -413,6 +409,7 @@ def process_truvari(sample, run):
     except StopIteration:
         raise FileNotFoundError("Required files not found in reference or run directories.")
     # Find output directory or create if it doesnt exist
+    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
     output_path = None
     for name in os.listdir(PROCESSED_DIR):
         if run in name:
@@ -443,7 +440,7 @@ def process_truvari(sample, run):
             subprocess.run(bcftools_cmd, check=True)
             subprocess.run(tabix_cmd, check=True)
         except Exception as e:
-            print(f"bcftools failed to filter reference vcf: {e}")
+            raise RuntimeError(f"bcftools failed to filter reference vcf: {e}") from e
             
         # Then normalize chromosome names (add "chr" prefix)
         annotate_cmd = [
@@ -456,10 +453,10 @@ def process_truvari(sample, run):
         # Create chromosome mapping (1->chr1, 2->chr2, etc.)
         chrom_map = "\n".join([f"{i} chr{i}" for i in range(1, 23)] + ["X chrX", "Y chrY"])
         try:
-            result = subprocess.run(annotate_cmd, input=chrom_map.encode(), check=True)
+            subprocess.run(annotate_cmd, input=chrom_map.encode(), check=True)
             subprocess.run(['tabix', '-p', 'vcf', normalized_ref_vcf], check=True)
         except Exception as e:
-            print(f"bcftools failed to normalize chromosome names: {e}")
+            raise RuntimeError(f"bcftools failed to normalize chromosome names: {e}") from e
     # Run VCF filter
     bcftools_cmd = [
         "bcftools", "view",
@@ -473,7 +470,7 @@ def process_truvari(sample, run):
         subprocess.run(bcftools_cmd, check=True)
         subprocess.run(tabix_cmd, check=True)
     except Exception as e:
-        print(f"bcftools failed to filter run vcf.")
+        raise RuntimeError(f"bcftools failed to filter run vcf: {e}") from e
     # Normalize BED file chromosome names (add chr prefix)
     normalized_bed = ref_dir_path / ref_bed.name.replace('.bed', '.normalized.bed')
     if not normalized_bed.exists():
@@ -489,7 +486,7 @@ def process_truvari(sample, run):
                             fields[0] = f'chr{fields[0]}'
                         f_out.write('\t'.join(fields) + '\n')
         except Exception as e:
-            print(f"Failed to normalize BED file: {e}")
+            raise RuntimeError(f"Failed to normalize BED file: {e}") from e
     
     # Run Truvari
     truvari_script = PROJECT_ROOT / 'pipeline' / 'truvari.sh'
@@ -529,19 +526,16 @@ def post_truvari_metrics(sample, run, summary_json_path):
     
     # Validate and send
     try:
-        print("Validating Truvari metric data")
         validated_metrics = schemas.TruvariMetricCreate(**truvari_metrics)
-        print("Posting Truvari metric")
-        response = requests.post(
-            f"http://localhost:8002/api/v1/runs/{run_name}/truvari_metrics",
-            json=validated_metrics.model_dump()
-        )
-        response.raise_for_status()
+        db = SessionLocal()
+        try:
+            crud.create_truvari_metric(db, validated_metrics)
+        finally:
+            db.close()
         print(f"Successfully posted Truvari metric for {run_name}.")
     except Exception as e:
         print(f"Validation/posting error: {e}")
-        if hasattr(e, 'response') and e.response is not None:
-            print("Response content:", e.response.text)
+        raise
 
 def to_container(p: Path) -> str:
     root = PROJECT_ROOT.resolve()
@@ -550,6 +544,7 @@ def to_container(p: Path) -> str:
 def process_csv_files(run):
     # Paths to input and output directories
     input_dir = LAB_RUN_DIR / run
+    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
     output_path = None
     # Find output directory with prefixed date
     for name in os.listdir(PROCESSED_DIR):
@@ -569,7 +564,7 @@ def process_csv_files(run):
     for csv_file in csv_files:
         output_file = output_path / csv_file.name
         reformat_csv(csv_file, output_file)
-        #post_qc_metrics(output_file, f"{sample}_{run}")
+        post_qc_metrics(output_file, run)
 
 def post_qc_metrics(output_file, run_name):
     """
@@ -577,10 +572,9 @@ def post_qc_metrics(output_file, run_name):
     """
     try:
         id = utils.get_run_id(run_name)
-        url = f"http://localhost:8002/api/v1/qc_metrics/{id}"
     except Exception as e:
         print(f"Error getting run ID for {run_name}: {e}")
-        return
+        raise
     # Create qc metric from schema
     try:
         qc_metric = schemas.QCMetricCreate(
@@ -591,15 +585,17 @@ def post_qc_metrics(output_file, run_name):
         )
     except Exception as e:
         print(f"Error creating QC metric for {output_file}: {e}")
-        return
-    try: 
-        response = requests.post(url, json=qc_metric.model_dump())
-        response.raise_for_status()
+        raise
+    try:
+        db = SessionLocal()
+        try:
+            crud.create_qc_metric(db, qc_metric)
+        finally:
+            db.close()
         print(f"Successfully posted QC metric for {run_name}.")
-    except requests.RequestException as e:
+    except Exception as e:
         print(f"Error posting QC metric for {run_name}: {e}")
-        if hasattr(e, 'response') and e.response is not None:
-            print("Response content:", e.response.text)
+        raise
 
 
 if __name__ == "__main__":

@@ -1,16 +1,18 @@
 import hashlib
-import subprocess
 import re
 import csv
-import requests
 from pathlib import Path
 from datetime import datetime
 import subprocess
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-LAB_RUN_DIR = PROJECT_ROOT / 'data' / 'lab_runs'
-PROCESSED_DIR = PROJECT_ROOT / 'data' / 'processed'
-REFERENCE_DIR = PROJECT_ROOT / 'data' / 'reference'
+from api.app import crud
+from api.app.database import SessionLocal
+from api.app import settings
+
+PROJECT_ROOT = settings.PROJECT_ROOT
+LAB_RUN_DIR = settings.LAB_RUNS_DIR
+PROCESSED_DIR = settings.PROCESSED_DIR
+REFERENCE_DIR = settings.REFERENCE_DIR
 
 def get_run_id(run_name) -> int:
     """
@@ -18,58 +20,62 @@ def get_run_id(run_name) -> int:
     Returns the run_id as an integer.
     Raises ValueError if not found.
     """
-    url = f"http://localhost:8002/api/v1/runs/by-name/{run_name}"
-    response = requests.get(url)
-    if response.status_code == 200:
-        run_info = response.json()
-        return run_info["id"]
-    else:
+    db = SessionLocal()
+    try:
+        run = crud.get_lab_run_by_name(db, run_name)
+        if run:
+            return run.id
         raise ValueError(f"Run ID not found for run_name: {run_name}")
+    finally:
+        db.close()
 
 def checksum(sample, run):
     """
     Verify the MD5 checksum of the gvcf file for a given reference and run.
-    Uses the flat directory structure: LAB_RUN_DIR / "{sample}_{run}"
     """
-    # Use the flat directory structure
     run_path = LAB_RUN_DIR / f"{sample}_{run}"
-    
-    # Find the GVCF file (could have different naming patterns)
-    gvcf_files = list(run_path.glob('*.gvcf.gz'))
+    gvcf_files = list(run_path.glob("*.gvcf.gz"))
     if not gvcf_files:
         raise FileNotFoundError(f"No GVCF file found in {run_path}")
-    
-    # Use the first GVCF file found (typically there's only one)
+
     gvcf_path = gvcf_files[0]
-    
-    # Check for MD5 checksum file (optional - skip if not present)
-    md5_path = run_path / f"{gvcf_path.name}.md5sum"
-    if not md5_path.exists():
-        # Also try alternative MD5 naming patterns
-        md5_alt1 = run_path / f"{gvcf_path.name}.md5"
-        md5_alt2 = run_path / f"{gvcf_path.stem}.md5sum"
-        if md5_alt1.exists():
-            md5_path = md5_alt1
-        elif md5_alt2.exists():
-            md5_path = md5_alt2
-        else:
-            # MD5 file not found - skip checksum verification
-            print(f"Warning: MD5 checksum file not found for {gvcf_path.name}. Skipping checksum verification.")
-            return
-    
-    # Read the MD5 checksum
+    md5_candidates = [
+        run_path / f"{gvcf_path.name}.md5sum",
+        run_path / f"{gvcf_path.name}.md5",
+        run_path / f"{gvcf_path.stem}.md5sum",
+    ]
+    md5_path = next((path for path in md5_candidates if path.exists()), None)
+    if md5_path is None:
+        print(f"Warning: MD5 checksum file not found for {gvcf_path.name}. Skipping checksum verification.")
+        return
+
     with open(md5_path, 'r') as f:
-        md5_content = f.read().strip()
-        # Handle different MD5 file formats (MD5 hash only, or "hash filename")
-        expected_md5 = md5_content.split()[0] if md5_content else md5_content
-    
-    # Calculate the MD5 checksum of the gvcf file
+        expected_md5 = f.read().strip().split()[0]
+
+    digest = hashlib.md5()
     with open(gvcf_path, 'rb') as f:
-        file_md5 = hashlib.md5(f.read()).hexdigest()
-    
-    # Compare the checksums
+        for chunk in iter(lambda: f.read(8 * 1024 * 1024), b""):
+            digest.update(chunk)
+    file_md5 = digest.hexdigest()
     if file_md5 != expected_md5:
         raise ValueError(f"MD5 checksum mismatch for {gvcf_path.name}. Expected: {expected_md5}, Got: {file_md5}")
+
+
+def split_run_name(run_name: str) -> tuple[str, str]:
+    """Split sample/run names like NA24143_Lib3_Rep1_R001 into sample and run."""
+    parts = run_name.split("_")
+    if len(parts) < 2:
+        raise ValueError(f"Invalid run name format: {run_name}")
+
+    for index in range(len(parts) - 1, -1, -1):
+        part = parts[index]
+        if part.startswith("R") and part[1:].isdigit():
+            sample = "_".join(parts[:index])
+            run = "_".join(parts[index:])
+            if sample and run:
+                return sample, run
+
+    return "_".join(parts[:-1]), parts[-1]
 
 def get_gvcf_date(run_gvcf) -> str:
     """
@@ -79,7 +85,7 @@ def get_gvcf_date(run_gvcf) -> str:
     try:
         result = subprocess.run(cmd, capture_output=True, check=True, text=True)
     except subprocess.CalledProcessError as e:
-        print("bcftools failed to get date: ", e.stderr)
+        raise RuntimeError(f"bcftools failed to get date: {e.stderr}") from e
     # Search for the DRAGENCommandLine header line
     for line in result.stdout.splitlines():
         if "##DRAGENCommandLine=" in line:
@@ -89,7 +95,7 @@ def get_gvcf_date(run_gvcf) -> str:
                     date = str(parse_dragen_date(match.group(1)))
                     return date
                 except ValueError as e:
-                    raise ValueError("Failed to get date from gvcf: ", e.stderr)
+                    raise ValueError(f"Failed to get date from gvcf: {e}")
     raise ValueError("Missing date from gvcf")
 
 def parse_dragen_date(date):

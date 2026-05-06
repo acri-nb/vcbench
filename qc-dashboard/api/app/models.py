@@ -1,4 +1,4 @@
-from sqlalchemy import (Column, Integer, String, Float, DateTime,
+from sqlalchemy import (Column, Integer, String, Float, DateTime, Text, UniqueConstraint,
                         ForeignKey, Enum as SQLAlchemyEnum)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -39,15 +39,19 @@ class LabRun(Base):
     status = Column(SQLAlchemyEnum(RunStatus), nullable=False, default=RunStatus.PENDING_PROCESSING)
     
     created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    processing_started_at = Column(DateTime, nullable=True)
+    processing_completed_at = Column(DateTime, nullable=True)
     approved_at = Column(DateTime, nullable=True)
+    error_message = Column(Text, nullable=True)
     
     approved_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     approved_by = relationship("User")
 
     # Relations
-    qc_metrics = relationship("QCMetric", back_populates="run")
-    happy_metrics = relationship("HappyMetric", back_populates="run")
-    truvari_metrics = relationship("TruvariMetric", back_populates="run")
+    qc_metrics = relationship("QCMetric", back_populates="run", cascade="all, delete-orphan")
+    happy_metrics = relationship("HappyMetric", back_populates="run", cascade="all, delete-orphan")
+    truvari_metrics = relationship("TruvariMetric", back_populates="run", cascade="all, delete-orphan")
 
 class QCMetric(Base):
     __tablename__ = "qc_metrics"
@@ -56,7 +60,7 @@ class QCMetric(Base):
     metric_value = Column(Float, nullable=True)
     file_source = Column(String, nullable=False) # ex: 'mapping_metrics.csv'
     
-    run_id = Column(Integer, ForeignKey("lab_runs.id"))
+    run_id = Column(Integer, ForeignKey("lab_runs.id", ondelete="CASCADE"))
     run = relationship("LabRun", back_populates="qc_metrics")
 
 class HappyMetric(Base):
@@ -81,40 +85,30 @@ class HappyMetric(Base):
     truth_het_hom_ratio = Column(Float, nullable=False)
     query_het_hom_ratio = Column(Float, nullable=False)
     
-    run_id = Column(Integer, ForeignKey("lab_runs.id"))
+    run_id = Column(Integer, ForeignKey("lab_runs.id", ondelete="CASCADE"))
     run = relationship("LabRun", back_populates="happy_metrics")
+
 
 class TruvariMetric(Base):
     __tablename__ = "truvari_metrics"
+    __table_args__ = (UniqueConstraint("run_id", name="unique_run_truvari"),)
     id = Column(Integer, primary_key=True, index=True)
-    
-    # True Positives
-    tp_base = Column(Integer, nullable=False, comment="True Positives in base (reference)")
-    tp_comp = Column(Integer, nullable=False, comment="True Positives in comparison (query)")
-    
-    # False Positives and False Negatives
-    fp = Column(Integer, nullable=False, comment="False Positives")
-    fn = Column(Integer, nullable=False, comment="False Negatives")
-    
-    # Performance metrics
-    precision = Column(Float, nullable=False, comment="Precision (TP / (TP + FP))")
-    recall = Column(Float, nullable=False, comment="Recall/Sensitivity (TP / (TP + FN))")
-    f1 = Column(Float, nullable=False, comment="F1 Score (harmonic mean of precision and recall)")
-    
-    # Variant counts
-    base_cnt = Column(Integer, nullable=False, comment="Total variants in base (after filtering)")
-    comp_cnt = Column(Integer, nullable=False, comment="Total variants in comparison (after filtering)")
-    
-    # Genotype concordance
-    gt_concordance = Column(Float, nullable=False, comment="Genotype concordance for TP variants")
-    tp_comp_tp_gt = Column(Integer, nullable=False, comment="TP-comp with correct genotype")
-    tp_comp_fp_gt = Column(Integer, nullable=False, comment="TP-comp with incorrect genotype")
-    tp_base_tp_gt = Column(Integer, nullable=False, comment="TP-base with correct genotype")
-    tp_base_fp_gt = Column(Integer, nullable=False, comment="TP-base with incorrect genotype")
-    
-    # Timestamps
+
+    tp_base = Column(Integer, nullable=False)
+    tp_comp = Column(Integer, nullable=False)
+    fp = Column(Integer, nullable=False)
+    fn = Column(Integer, nullable=False)
+    precision = Column(Float, nullable=False)
+    recall = Column(Float, nullable=False)
+    f1 = Column(Float, nullable=False)
+    base_cnt = Column(Integer, nullable=False)
+    comp_cnt = Column(Integer, nullable=False)
+    gt_concordance = Column(Float, nullable=False)
+    tp_comp_tp_gt = Column(Integer, nullable=False)
+    tp_comp_fp_gt = Column(Integer, nullable=False)
+    tp_base_tp_gt = Column(Integer, nullable=False)
+    tp_base_fp_gt = Column(Integer, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
-    
-    # Foreign key
-    run_id = Column(Integer, ForeignKey("lab_runs.id"))
+
+    run_id = Column(Integer, ForeignKey("lab_runs.id", ondelete="CASCADE"), nullable=False)
     run = relationship("LabRun", back_populates="truvari_metrics")

@@ -2,23 +2,20 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.orm import Session
 from pathlib import Path
 from typing import Optional
-import shutil
 
 from api.app import crud, schemas, models
 from api.app.database import get_db
+from api.app.security import Role, require_role
+from api.app import settings
 from api.tasks.process_run import run_pipeline
-from api.tasks.upload_run import upload_run
+from api.tasks.upload_run import upload_run, unique_upload_path, sanitize_upload_filename
+from api.tasks.utils import split_run_name
 
 router = APIRouter()
 
-# Get absolute path to this file's directory
-APP_DIR = Path(__file__).parent.parent.parent
-PROJECT_ROOT = APP_DIR.parent.parent.parent
-LAB_RUNS_DIR = PROJECT_ROOT / "data" / "lab_runs"
-PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
-
-# Temporary directory for uploads
-UPLOAD_DIR = PROJECT_ROOT / "qc-dashboard" / "api" / "app" / "tmp" / "uploads"
+LAB_RUNS_DIR = settings.LAB_RUNS_DIR
+PROCESSED_DIR = settings.PROCESSED_DIR
+UPLOAD_DIR = settings.UPLOAD_DIR
 
 # DB ---------------------------------------------------------------------------------------
 
@@ -26,25 +23,40 @@ UPLOAD_DIR = PROJECT_ROOT / "qc-dashboard" / "api" / "app" / "tmp" / "uploads"
 async def upload_lab_run(
     benchmarking: Optional[str] = Query(default=""),
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _role: Role = Depends(require_role(Role.OPERATOR)),
 ):
     """Upload a lab run file."""
-    if not file.filename.endswith('.zip'):
-        raise HTTPException(status_code=400, detail="Only .zip files are allowed")
+    try:
+        filename = sanitize_upload_filename(file.filename)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    temp_path = UPLOAD_DIR / file.filename
+    temp_path = unique_upload_path(filename)
     with open(temp_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        bytes_written = 0
+        while True:
+            chunk = await file.read(8 * 1024 * 1024)
+            if not chunk:
+                break
+            bytes_written += len(chunk)
+            if bytes_written > settings.MAX_UPLOAD_BYTES:
+                if temp_path.exists():
+                    temp_path.unlink()
+                raise HTTPException(status_code=413, detail="Upload exceeds configured size limit")
+            buffer.write(chunk)
     lab_run_create = schemas.LabRunCreate(
-        run_name=file.filename[:-4],  # Remove .zip extension
-        status="PENDING_PROCESSING"
+        run_name=Path(filename).stem,
+        status=models.RunStatus.PENDING_PROCESSING
     )
     try:
         lab_run = crud.create_lab_run(db, lab_run_create)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     try:
-        sample, run = upload_run()
+        crud.update_lab_run_status(db, lab_run.id, models.RunStatus.PROCESSING)
+        sample, run = upload_run(temp_path)
+        crud.update_lab_run_name(db, lab_run.id, f"{sample}_{run}")
         run_pipeline(
             sample,
             run,
@@ -57,12 +69,16 @@ async def upload_lab_run(
         crud.update_lab_run_status(db, lab_run.id, models.RunStatus.AWAITING_APPROVAL)
     except Exception as e:
         # Update lab run status to FAILED
-        crud.update_lab_run_status(db, lab_run.id, models.RunStatus.FAILED)
+        crud.update_lab_run_status(db, lab_run.id, models.RunStatus.FAILED, error_message=str(e))
         raise HTTPException(status_code=500, detail=f"Error processing run: {str(e)}")
     return lab_run
 
 @router.post("/runs/{run_id}/approve")
-def approve_lab_run(run_id: int, db: Session = Depends(get_db)):
+def approve_lab_run(
+    run_id: int,
+    db: Session = Depends(get_db),
+    _role: Role = Depends(require_role(Role.REVIEWER)),
+):
     """Approve a lab run."""
     lab_run = crud.get_lab_run(db, run_id)
     if not lab_run:
@@ -85,7 +101,11 @@ def get_run_by_name(run_name: str, db: Session = Depends(get_db)):
     return lab_run
 
 @router.delete("/runs/{run_id}")
-def delete_lab_run(run_id: int, db: Session = Depends(get_db)):
+def delete_lab_run(
+    run_id: int,
+    db: Session = Depends(get_db),
+    _role: Role = Depends(require_role(Role.ADMIN)),
+):
     deleted = crud.delete_lab_run(db, run_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Lab run not found")
@@ -97,70 +117,80 @@ def delete_lab_run(run_id: int, db: Session = Depends(get_db)):
 def list_lab_runs(db: Session = Depends(get_db)):
     """List all lab runs."""
     try:
+        runs_by_name = {}
+        try:
+            for run in crud.get_lab_runs(db):
+                runs_by_name[run.run_name] = {
+                    "id": run.id,
+                    "run_name": run.run_name,
+                    "status": run.status.value,
+                    "created_at": run.created_at,
+                    "updated_at": run.updated_at,
+                    "approved_at": run.approved_at,
+                    "error_message": run.error_message,
+                }
+        except Exception:
+            db.rollback()
+
         if not LAB_RUNS_DIR.exists():
-            return []
+            return list(runs_by_name.values())
         
-        runs_data = []
         for run in LAB_RUNS_DIR.iterdir():
             if run.is_dir():
                 # Check if it's been processed
-                status = "COMPLETED" if (PROCESSED_DIR / run.name).exists() else "PENDING"
-                runs_data.append({
+                status = (
+                    models.RunStatus.AWAITING_APPROVAL.value
+                    if find_processed_run_dir(run.name)
+                    else models.RunStatus.PENDING_PROCESSING.value
+                )
+                runs_by_name.setdefault(run.name, {
+                    "id": None,
                     "run_name": run.name,
                     "status": status,
-                    "approved_at": None  # Add this field for the frontend
+                    "created_at": None,
+                    "updated_at": None,
+                    "approved_at": None,
+                    "error_message": None,
                 })
-        return runs_data
+        return list(runs_by_name.values())
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error listing runs: {str(e)}")
     
-@router.get("/runs/{metric_name}")
-def get_run_metrics(metric_name: str, db: Session = Depends(get_db)):
-    samples = list_lab_runs(db)
-    
 @router.get("/runs/{run_name}/benchmarking")
 def get_run_benchmarking(run_name: str, db: Session = Depends(get_db)):
-    print(run_name)
-    run_dir = None
-    for run in PROCESSED_DIR.iterdir():
-        if run_name in run.name:
-            run_dir = run
-            break
+    run_dir = find_processed_run_dir(run_name)
     if not run_dir:
         raise HTTPException(status_code=404, detail="Run not found")
     benchmarks = {}
     benchmarks["truvari"] = any(run_dir.rglob("summary.json"))
     benchmarks["happy"] = any(run_dir.rglob("*.summary.csv"))
     benchmarks["stratified"] = any(run_dir.glob("*.extended.csv"))
+    benchmarks["csv"] = any(run_dir.glob("*.csv"))
     return benchmarks
 
 @router.post("/runs/{run_name}/benchmarking")
-async def process_run_benchmarking(run_name: str, benchmarking: str):
+async def process_run_benchmarking(
+    run_name: str,
+    benchmarking: str,
+    db: Session = Depends(get_db),
+    _role: Role = Depends(require_role(Role.OPERATOR)),
+):
+    lab_run = None
     try:
-        # Split run_name to extract sample and run
-        # Format: NA24143_Lib3_Rep1_R001 -> sample=NA24143_Lib3_Rep1, run=R001
-        parts = run_name.split("_")
-        if len(parts) < 2:
-            raise HTTPException(status_code=400, detail=f"Invalid run name format: {run_name}")
-        
-        # Find where "R001" or similar run identifier starts
-        # Assume the run identifier is the last part that starts with 'R'
-        run_idx = -1
-        for i in range(len(parts) - 1, -1, -1):
-            if parts[i].startswith('R') and parts[i][1:].isdigit():
-                run_idx = i
-                break
-        
-        if run_idx == -1:
-            # Fallback: treat everything before last underscore as sample
-            sample = "_".join(parts[:-1])
-            run = parts[-1]
-        else:
-            sample = "_".join(parts[:run_idx])
-            run = "_".join(parts[run_idx:])
-        
-        print(f"[runs.py] Benchmarking run_name={run_name}, extracted sample={sample}, run={run}")
-        
+        sample, run = split_run_name(run_name)
+        try:
+            lab_run = crud.get_lab_run_by_name(db, run_name)
+        except Exception:
+            db.rollback()
+        if lab_run is None:
+            lab_run = crud.create_lab_run(
+                db,
+                schemas.LabRunCreate(
+                    run_name=run_name,
+                    status=models.RunStatus.PENDING_PROCESSING,
+                ),
+            )
+        crud.update_lab_run_status(db, lab_run.id, models.RunStatus.PROCESSING)
         run_pipeline(
             sample,
             run,
@@ -169,8 +199,25 @@ async def process_run_benchmarking(run_name: str, benchmarking: str):
             csv_reformat="csv" in benchmarking,
             truvari="truvari" in benchmarking
         )
-        return {"status": "success", "message": f"Benchmarking started for {run_name}"}
+        crud.update_lab_run_status(db, lab_run.id, models.RunStatus.AWAITING_APPROVAL)
+        return {"ok": True, "run_name": run_name, "benchmarking": benchmarking}
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        if lab_run:
+            try:
+                crud.update_lab_run_status(db, lab_run.id, models.RunStatus.FAILED, error_message=str(e))
+            except Exception:
+                db.rollback()
         raise HTTPException(status_code=500, detail=f"Error processing run: {str(e)}")
+
+
+def find_processed_run_dir(run_name: str) -> Optional[Path]:
+    if not PROCESSED_DIR.exists():
+        return None
+    exact = PROCESSED_DIR / run_name
+    if exact.exists() and exact.is_dir():
+        return exact
+    matching_dirs = [
+        run for run in PROCESSED_DIR.iterdir()
+        if run.is_dir() and run.name.endswith(f"_{run_name}")
+    ]
+    return matching_dirs[0] if matching_dirs else None

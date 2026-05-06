@@ -51,15 +51,9 @@ async def get_samples(file_type: FileTypeEnum):
             continue
         for file in run.iterdir():
             if suffix in file.name.lower():
-                name = run.name.split('_', 1)[1]
+                name = run.name.split('_', 1)[1] if '_' in run.name else run.name
                 samples.append(name)
                 break
-
-    if not samples:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Aucun échantillon trouvé pour le type '{file_type.value}'"
-        )
 
     return {"samples": sorted(samples)}
 

@@ -1,15 +1,10 @@
-import os
-
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql+psycopg2://wgs_user:password@localhost:5433/wgs",
-)
+from api.app.settings import DATABASE_URL
 
 # Create the SQLAlchemy engine
-engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 # Create a declarative base class for model definitions
 Base = declarative_base()

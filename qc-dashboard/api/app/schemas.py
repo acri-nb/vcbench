@@ -11,7 +11,7 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     full_name: Optional[str] = None
-    hashed_password: str
+    password: str
 
 class UserResponse(UserBase):
     id: int
@@ -32,8 +32,12 @@ class LabRunCreate(LabRunBase):
 class LabRunResponse(LabRunBase):
     id: int
     created_at: datetime
+    updated_at: Optional[datetime] = None
+    processing_started_at: Optional[datetime] = None
+    processing_completed_at: Optional[datetime] = None
     approved_at: Optional[datetime] = None
     approved_by_id: Optional[int] = None
+    error_message: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -42,6 +46,7 @@ class LabRunUpdate(BaseModel):
     status: Optional[RunStatus] = None
     approved_by_id: Optional[int] = None
     approved_at: Optional[datetime] = None
+    error_message: Optional[str] = None
 
 # QC Metric
 
@@ -64,10 +69,23 @@ class QCMetricResponse(QCMetricBase):
 
 class HappyMetricBase(BaseModel):
     type: str
-    recall: float
-    precision: float
-    frac_na: float
-    f1_score: float
+    filter: str
+    truth_total: int
+    truth_tp: int
+    truth_fn: int
+    query_total: int
+    query_fp: int
+    query_unk: int
+    fp_gt: float
+    fp_al: float
+    metric_recall: float
+    metric_precision: float
+    metric_frac_na: float
+    metric_f1_score: float
+    truth_titv_ratio: float
+    query_titv_ratio: float
+    truth_het_hom_ratio: float
+    query_het_hom_ratio: float
 
 class HappyMetricCreate(HappyMetricBase):
     run_id: int
@@ -78,6 +96,7 @@ class HappyMetricResponse(HappyMetricBase):
 
     class Config:
         from_attributes = True
+
 
 # Truvari Metric
 

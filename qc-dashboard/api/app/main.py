@@ -1,6 +1,7 @@
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.wsgi import WSGIMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 import sys
 from pathlib import Path
 
@@ -9,11 +10,29 @@ ROOT = Path(__file__).resolve().parent.parent.parent  # qc-dashboard
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from api.app.api_v1.endpoints import happy_metrics, users, runs, qc_metrics, dash, uploads, download_status, truvari_metrics
+from api.app.api_v1.endpoints import (
+    dash,
+    download_status,
+    happy_metrics,
+    qc_metrics,
+    runs,
+    truvari_metrics,
+    uploads,
+    users,
+)
 from api.app import websocket as ws_manager
 
 # Import the Dash app
 from dash_app.app import dash_app
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "same-origin")
+        response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        return response
 
 app = FastAPI(
     title="WGS Quality Control Dashboard",
@@ -35,6 +54,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(SecurityHeadersMiddleware)
 
 # Include API routers with proper prefixes (before mounting Dash)
 app.include_router(happy_metrics.router, prefix="/api/v1", tags=["happy-metrics"])
@@ -46,10 +66,9 @@ app.include_router(qc_metrics.router, prefix="/api/v1", tags=["qc-metrics"])
 app.include_router(dash.router, prefix="/api/v1/dash", tags=["dash"])
 app.include_router(download_status.router, prefix="/api/v1", tags=["download-status"])
 
-# WebSocket endpoint for real-time log streaming
+
 @app.websocket("/ws/download/{sample_id}")
 async def websocket_download_logs(websocket: WebSocket, sample_id: str):
-    """WebSocket endpoint for streaming download logs in real-time"""
     await ws_manager.websocket_endpoint(websocket, sample_id)
 
 # Mount the Dash app at the root path

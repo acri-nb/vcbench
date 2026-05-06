@@ -2,13 +2,14 @@
 # Core dependencies for bioinformatics pipeline and web application
 
 # Web Framework & API
-fastapi>=0.68.0
+fastapi>=0.100.0
 uvicorn[standard]>=0.15.0
-pydantic[email]>=1.8.0
+pydantic[email]>=2.0.0
 
 # Database
 sqlalchemy>=1.4.0
 psycopg2-binary>=2.9.0
+alembic>=1.13.0
 
 # Data Processing
 pandas>=1.5.0
@@ -22,10 +23,6 @@ plotly>=5.0.0
 # HTTP & Async
 httpx>=0.20.0
 aiofiles>=0.8.0
-
-# WebSocket support
-python-socketio>=5.0.0
-websockets>=10.0
 
 # Email validation
 email-validator>=1.1.0
