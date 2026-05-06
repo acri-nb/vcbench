@@ -28,7 +28,7 @@ def _site_header():
                     dcc.Link("Pipeline", href="/runs"),
                     dcc.Link("Dashboard", href="/home"),
                     dcc.Link("Truvari", href="/truvari", className="active"),
-                    html.A("API", href="/api/docs", target="_blank"),
+                    html.A("API", href="/docs", target="_blank"),
                 ],
                 className="site-nav",
             ),
@@ -291,4 +291,3 @@ def display_truvari_results(selected_run):
             "padding": "40px",
             "color": "#e74c3c"
         })
-
