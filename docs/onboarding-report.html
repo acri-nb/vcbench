@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VCBench — Six-month evolution report</title>
+<style>
+:root {
+  --ink: #0e0c08;
+  --graphite: #27251e;
+  --dusk: #72706b;
+  --stone: #92918b;
+  --paper: #ffffff;
+  --parchment: #faf8f5;
+  --hairline: rgba(39, 37, 30, 0.12);
+  --hairline-soft: rgba(39, 37, 30, 0.06);
+  --brand: #1f1d18;
+  --success: #1d6b3a;
+  --success-bg: #e8f3eb;
+  --warn: #8a5300;
+  --warn-bg: #fbf1de;
+  --danger: #8b1f1f;
+  --danger-bg: #f7e6e3;
+  --info: #234e7a;
+  --info-bg: #e6eef7;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 14px rgba(0,0,0,0.06);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: Inter, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--ink);
+  background: var(--parchment);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.55;
+  font-size: 15px;
+}
+code, pre, .mono {
+  font-family: ui-monospace, "SF Mono", Menlo, Monaco, "Cascadia Mono", Consolas, monospace;
+  font-size: 13px;
+}
+a { color: var(--brand); }
+a:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 2px; }
+
+.shell {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100vh;
+}
+nav.toc {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  border-right: 1px solid var(--hairline);
+  background: var(--paper);
+  padding: 28px 20px 32px;
+  overflow-y: auto;
+}
+nav.toc .brand {
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dusk);
+  margin-bottom: 16px;
+}
+nav.toc .title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--graphite);
+  margin-bottom: 18px;
+  line-height: 1.3;
+}
+nav.toc ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  counter-reset: step;
+}
+nav.toc li {
+  counter-increment: step;
+  margin-bottom: 2px;
+}
+nav.toc a {
+  display: block;
+  padding: 7px 10px;
+  border-radius: var(--r-sm);
+  text-decoration: none;
+  color: var(--graphite);
+  font-size: 13.5px;
+  transition: background 120ms;
+}
+nav.toc a::before {
+  content: counter(step, decimal-leading-zero) "  ";
+  color: var(--stone);
+  font-feature-settings: "tnum";
+}
+nav.toc a:hover { background: var(--parchment); }
+nav.toc a.is-active {
+  background: var(--ink);
+  color: var(--paper);
+}
+nav.toc a.is-active::before { color: rgba(255,255,255,0.55); }
+nav.toc .meta {
+  margin-top: 28px;
+  font-size: 12px;
+  color: var(--dusk);
+  border-top: 1px solid var(--hairline-soft);
+  padding-top: 16px;
+}
+
+main {
+  padding: 0 56px 96px;
+  max-width: 1020px;
+}
+
+section.slide {
+  padding: 64px 0 24px;
+  border-bottom: 1px solid var(--hairline-soft);
+  scroll-margin-top: 16px;
+}
+section.slide:last-child { border-bottom: none; }
+section.slide h1, section.slide h2 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+section.slide h1 {
+  font-size: 38px;
+  margin: 0 0 14px;
+  line-height: 1.15;
+}
+section.slide h2 {
+  font-size: 22px;
+  margin: 36px 0 12px;
+}
+section.slide h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 22px 0 8px;
+  color: var(--graphite);
+}
+section.slide .eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--stone);
+  margin-bottom: 12px;
+}
+section.slide .lede {
+  font-size: 17px;
+  color: var(--graphite);
+  max-width: 64ch;
+}
+section.slide p { max-width: 74ch; }
+
+/* cover */
+.cover {
+  padding: 96px 0 48px;
+  border-bottom: 1px solid var(--hairline);
+}
+.cover .badge {
+  display: inline-block;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--paper);
+  background: var(--ink);
+  padding: 4px 10px;
+  border-radius: 999px;
+  margin-bottom: 24px;
+}
+.cover h1 { font-size: 52px; line-height: 1.02; margin: 0 0 16px; }
+.cover .subtitle { font-size: 19px; color: var(--dusk); max-width: 64ch; }
+.cover .pillstrip {
+  display: flex;
+  gap: 8px;
+  margin-top: 32px;
+  flex-wrap: wrap;
+}
+.cover .pill {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--hairline);
+  background: var(--paper);
+  color: var(--graphite);
+}
+
+/* range banner */
+.range {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
+  margin: 28px 0 8px;
+  padding: 18px 22px;
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+}
+.range .end h4 {
+  margin: 0 0 4px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dusk);
+  font-weight: 600;
+}
+.range .end .v {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.range .end .s {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--dusk);
+}
+.range .arrow {
+  font-size: 22px;
+  color: var(--stone);
+}
+.range .end.right { text-align: right; }
+
+/* tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0 8px;
+  font-size: 14px;
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+th, td {
+  padding: 10px 14px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--hairline-soft);
+}
+th {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dusk);
+  background: var(--parchment);
+  font-weight: 500;
+}
+tr:last-child td { border-bottom: none; }
+
+/* tags */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.tag-danger { color: var(--danger); background: var(--danger-bg); border-color: rgba(139, 31, 31, 0.18); }
+.tag-warn { color: var(--warn); background: var(--warn-bg); border-color: rgba(138, 83, 0, 0.2); }
+.tag-info { color: var(--info); background: var(--info-bg); border-color: rgba(35, 78, 122, 0.2); }
+.tag-success { color: var(--success); background: var(--success-bg); border-color: rgba(29, 107, 58, 0.2); }
+.tag-neutral { color: var(--graphite); background: var(--parchment); border-color: var(--hairline); }
+
+/* code blocks */
+pre {
+  background: var(--ink);
+  color: #f4efe5;
+  padding: 16px 18px;
+  border-radius: var(--r-md);
+  overflow-x: auto;
+  margin: 12px 0;
+  box-shadow: var(--shadow-sm);
+  line-height: 1.5;
+}
+pre .add { color: #9be3a4; display: block; }
+pre .del { color: #ff9d9d; display: block; }
+pre .ctx { color: #b3aea2; display: block; }
+pre .cmt { color: #8a8377; font-style: italic; }
+code:not(pre code) {
+  background: var(--parchment);
+  border: 1px solid var(--hairline);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 12.5px;
+}
+
+/* cards */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  margin: 18px 0;
+}
+.card {
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-sm);
+}
+.card h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+.card .filepath {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  color: var(--dusk);
+  margin-bottom: 12px;
+  word-break: break-all;
+}
+.card p { margin: 8px 0; font-size: 13.5px; color: var(--graphite); }
+.card ul { margin: 8px 0; padding-left: 18px; font-size: 13.5px; }
+.card li { margin: 4px 0; }
+
+/* verdict block */
+.verdict {
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  padding: 18px 22px;
+  box-shadow: var(--shadow-sm);
+  margin: 14px 0;
+}
+.verdict .bar { width: 4px; background: var(--ink); border-radius: 2px; }
+.verdict .bar.success { background: var(--success); }
+.verdict .bar.info { background: var(--info); }
+.verdict h3 { margin: 0 0 4px; font-size: 16px; }
+.verdict p { margin: 0; font-size: 14px; color: var(--graphite); }
+
+/* stats */
+.statgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+.stat {
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+}
+.stat .n {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  line-height: 1;
+  font-feature-settings: "tnum";
+}
+.stat .l {
+  font-size: 12px;
+  color: var(--dusk);
+  margin-top: 4px;
+  letter-spacing: 0.02em;
+}
+
+/* theme card row */
+.theme {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 24px;
+  padding: 24px 0;
+  border-top: 1px solid var(--hairline-soft);
+}
+.theme:first-of-type { border-top: none; padding-top: 12px; }
+.theme .side h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  color: var(--ink);
+}
+.theme .side .num {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--stone);
+  text-transform: uppercase;
+}
+.theme .side .meta {
+  font-size: 12px;
+  color: var(--dusk);
+  margin-top: 6px;
+}
+.theme .body p { margin: 0 0 10px; }
+.theme .body ul { padding-left: 18px; margin: 8px 0; }
+
+/* commit list */
+.commits {
+  margin: 14px 0;
+}
+.commit {
+  display: grid;
+  grid-template-columns: 90px 110px 1fr;
+  gap: 14px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--hairline-soft);
+  font-size: 13.5px;
+  align-items: baseline;
+}
+.commit:last-child { border-bottom: none; }
+.commit .sha { font-family: ui-monospace, monospace; font-size: 12.5px; color: var(--dusk); }
+.commit .date { font-size: 12px; color: var(--stone); }
+.commit .subject { color: var(--graphite); }
+.commit .subject .scope {
+  background: var(--parchment);
+  border: 1px solid var(--hairline);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11.5px;
+  margin-right: 6px;
+}
+
+/* keyboard hint */
+.kbd-hint {
+  position: fixed;
+  bottom: 18px;
+  right: 22px;
+  font-size: 11.5px;
+  color: var(--dusk);
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  padding: 6px 12px;
+  box-shadow: var(--shadow-sm);
+}
+kbd {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  background: var(--parchment);
+  border: 1px solid var(--hairline);
+  border-bottom-width: 2px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: var(--graphite);
+}
+
+/* responsive */
+@media (max-width: 900px) {
+  .shell { grid-template-columns: 1fr; }
+  nav.toc { position: relative; height: auto; border-right: none; border-bottom: 1px solid var(--hairline); }
+  main { padding: 0 24px 64px; }
+  .cover h1 { font-size: 36px; }
+  .theme { grid-template-columns: 1fr; }
+  .commit { grid-template-columns: 1fr; gap: 4px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { transition: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<nav class="toc" aria-label="Contents">
+  <div class="brand">VCBench • Report</div>
+  <div class="title">Six-month evolution<br/>2025-11-18 → 2026-05-05</div>
+  <ol>
+    <li><a href="#cover">Overview</a></li>
+    <li><a href="#scope">Scope &amp; numbers</a></li>
+    <li><a href="#themes">Themes of change</a></li>
+    <li><a href="#ui">UI &amp; design system</a></li>
+    <li><a href="#backend">Backend stabilization</a></li>
+    <li><a href="#migrations">Database &amp; migrations</a></li>
+    <li><a href="#api">API surface clean-up</a></li>
+    <li><a href="#pipeline">Pipeline hardening</a></li>
+    <li><a href="#docs">Docs overhaul</a></li>
+    <li><a href="#commits">Commits in the window</a></li>
+    <li><a href="#verdict">Verdict</a></li>
+  </ol>
+  <div class="meta">
+    Base <code>de0a2ca</code> 2025-11-18<br/>
+    Ref &nbsp;&nbsp;<code>1dfe286</code> 2026-05-05<br/>
+    Branch <code>main</code>
+  </div>
+</nav>
+
+<main>
+
+<section id="cover" class="slide cover">
+  <span class="badge">Internal report</span>
+  <h1>What changed in VCBench, Nov 2025 → May 2026</h1>
+  <p class="subtitle">A bird's-eye view of how the codebase evolved during the five-month window between the last commit before pause (<code>de0a2ca</code>, 2025-11-18) and the most recent merge to <code>main</code> (<code>1dfe286</code>, 2026-05-05). No regressions on the documented surface; substantial additions across UI, security, and developer ergonomics.</p>
+  <div class="pillstrip">
+    <span class="pill">15 commits</span>
+    <span class="pill">49 files touched</span>
+    <span class="pill">+3,320 / −2,126 lines</span>
+    <span class="pill">7 themes</span>
+    <span class="pill">0 features removed</span>
+  </div>
+</section>
+
+<section id="scope" class="slide">
+  <div class="eyebrow">01 — Scope</div>
+  <h2>Window of comparison</h2>
+
+  <div class="range">
+    <div class="end">
+      <h4>Then</h4>
+      <div class="v">2025-11-18</div>
+      <div class="s">de0a2ca · doc: update README</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="end right">
+      <h4>Now</h4>
+      <div class="v">2026-05-05</div>
+      <div class="s">1dfe286 · merge backend-stabilization</div>
+    </div>
+  </div>
+  <p style="font-size:13.5px;color:var(--dusk);">Note: a five-month implementation pause sits between November 2025 and the burst of May 2026 commits. All the activity below happened across roughly five working days.</p>
+
+  <div class="statgrid">
+    <div class="stat"><div class="n">15</div><div class="l">Commits merged</div></div>
+    <div class="stat"><div class="n">49</div><div class="l">Files touched</div></div>
+    <div class="stat"><div class="n">+3,320</div><div class="l">Lines added</div></div>
+    <div class="stat"><div class="n">−2,126</div><div class="l">Lines removed</div></div>
+    <div class="stat"><div class="n">11</div><div class="l">New files</div></div>
+    <div class="stat"><div class="n">2</div><div class="l">Files retired</div></div>
+  </div>
+
+  <h3>What this report covers</h3>
+  <p>Each section that follows takes one theme of change, names the commits that drove it, and shows the concrete artifact: a new module, a schema delta, a route fix, an asset reorganization.</p>
+</section>
+
+<section id="themes" class="slide">
+  <div class="eyebrow">02 — Themes</div>
+  <h2>Seven themes of change</h2>
+  <table>
+    <thead><tr><th>Theme</th><th>Commits</th><th>Direction</th></tr></thead>
+    <tbody>
+      <tr><td>UI &amp; design system overhaul</td><td>5</td><td><span class="tag tag-info">User-facing polish</span></td></tr>
+      <tr><td>Backend stabilization</td><td>2</td><td><span class="tag tag-success">Hardening</span></td></tr>
+      <tr><td>Database &amp; migrations</td><td>1 (squashed)</td><td><span class="tag tag-success">Infrastructure</span></td></tr>
+      <tr><td>API surface clean-up</td><td>1 (squashed)</td><td><span class="tag tag-success">Bug fixes</span></td></tr>
+      <tr><td>Pipeline hardening</td><td>1 (squashed)</td><td><span class="tag tag-success">Security</span></td></tr>
+      <tr><td>Docs overhaul</td><td>3</td><td><span class="tag tag-info">Documentation</span></td></tr>
+      <tr><td>Pipeline/script tightening</td><td>1</td><td><span class="tag tag-neutral">Cleanup</span></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="ui" class="slide">
+  <div class="eyebrow">03 — UI</div>
+  <h2>Design system overhaul</h2>
+  <p class="lede">The biggest visible change. The dashboard went from an ad-hoc collection of styles (Arial/Times, inline rules, emoji nav icons) to a tokenised design system applied across every page.</p>
+
+  <div class="theme">
+    <div class="side">
+      <div class="num">Δ 1</div>
+      <h3>Design tokens</h3>
+      <div class="meta">style.css: +708 lines<br/>bar.css: +365 lines</div>
+    </div>
+    <div class="body">
+      <p>A <code>:root</code> block now declares every recurring value as a custom property. Pages and components reference the tokens instead of hard-coding hex values or pixel offsets.</p>
+      <pre><span class="ctx">:root {</span>
+<span class="add">  --vc-brand-{900,700,500,100}      <span class="cmt">/* brand scale */</span></span>
+<span class="add">  --vc-accent-{500,400}             <span class="cmt">/* accent scale */</span></span>
+<span class="add">  --vc-ink-{900,700,500,300,100}    <span class="cmt">/* neutral ink */</span></span>
+<span class="add">  --vc-bg, --vc-surface, --vc-border</span>
+<span class="add">  --vc-success-{700,500,100}        <span class="cmt">/* status: success */</span></span>
+<span class="add">  --vc-warn-{700,500,100}           <span class="cmt">/* status: warn   */</span></span>
+<span class="add">  --vc-danger-{700,500,100}         <span class="cmt">/* status: danger */</span></span>
+<span class="add">  --vc-font-sans, --vc-font-mono</span>
+<span class="add">  --vc-fs-{xs,sm,md,lg,xl,2xl,3xl}  <span class="cmt">/* type scale  */</span></span>
+<span class="add">  --vc-s-{1,2,3,4,5,6,8}            <span class="cmt">/* 4 px spacing */</span></span>
+<span class="add">  --vc-r-{sm,md,lg}                 <span class="cmt">/* radius     */</span></span>
+<span class="add">  --vc-shadow-{sm,md,lg}            <span class="cmt">/* elevation  */</span></span>
+<span class="ctx">}</span></pre>
+    </div>
+  </div>
+
+  <div class="theme">
+    <div class="side">
+      <div class="num">Δ 2</div>
+      <h3>Reusable primitives</h3>
+      <div class="meta">New classes adopted across all four pages</div>
+    </div>
+    <div class="body">
+      <p>Eight named primitives replaced page-local one-offs. They compose to build every interactive element on the dashboard.</p>
+      <table>
+        <thead><tr><th>Class</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td><code>.btn</code> + <code>.btn-primary</code> / <code>.btn-secondary</code> / <code>.btn-success</code> / <code>.btn-ghost</code></td><td>Buttons with brand and status variants</td></tr>
+          <tr><td><code>.action-card</code></td><td>Workspace navigation card (used on <code>/</code>)</td></tr>
+          <tr><td><code>.runs-panel</code></td><td>Bordered surface for the recent-runs table</td></tr>
+          <tr><td><code>.section-card</code></td><td>Generic content card with subtle shadow and border</td></tr>
+          <tr><td><code>.pill</code> + <code>.is-success</code> / <code>.is-warn</code> / <code>.is-danger</code></td><td>Inline status pill</td></tr>
+          <tr><td><code>.alert</code> + variants</td><td>Inline alert blocks for success/warning/error</td></tr>
+          <tr><td><code>.empty-state</code></td><td>Calm empty placeholder</td></tr>
+          <tr><td><code>.error-state</code></td><td>Soft danger-coloured placeholder for callback failures</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="theme">
+    <div class="side">
+      <div class="num">Δ 3</div>
+      <h3>Page rewrites</h3>
+      <div class="meta">index.py, home.py, runs.py, truvari.py</div>
+    </div>
+    <div class="body">
+      <p>All four Dash pages were re-laid-out to consume the design system. Concrete changes:</p>
+      <ul>
+        <li><strong>Landing (<code>/</code>):</strong> tokenised hero band, recent-runs panel, three workspace action cards. Empty and error states render as designed alert blocks instead of raw traceback text.</li>
+        <li><strong><code>/home</code>:</strong> ships the shared site header so users can navigate back. Sidebar nav icons replaced with letter marks (Sum, SV, VC, CNV, ROH, HT, Plo, Bed, Cov, Map). The right rail collapsed shows a vertical <em>MANUAL STATUS</em> marker; expanded reveals the controls.</li>
+        <li><strong><code>/runs</code>:</strong> unified header, cleaner tabs, AWS S3 import section restyled with tokens, ZIP upload form rebuilt with a custom file drop zone and a 2 × 2 benchmarking option grid.</li>
+        <li><strong><code>/truvari</code>:</strong> shared header and design tokens for visual consistency.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="theme">
+    <div class="side">
+      <div class="num">Δ 4</div>
+      <h3>Accessibility &amp; resilience</h3>
+      <div class="meta">Cross-cutting</div>
+    </div>
+    <div class="body">
+      <ul>
+        <li>Inter system font stack with <code>text-wrap: balance</code> on headings — replaces the previous Arial/Times default chain.</li>
+        <li>Every interactive element exposes a <code>:focus-visible</code> ring built from <code>--vc-brand-500</code>.</li>
+        <li><code>prefers-reduced-motion: reduce</code> collapses every transition to ~0 ms.</li>
+        <li>Touch targets meet the 44 px minimum on the responsive breakpoint.</li>
+        <li>Status colors avoid red/green-only encoding; an amber warning tier is provided.</li>
+        <li>Dash callbacks now timeout after 4 s on reads and 10 s on POST, so a stalled API no longer freezes the page.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="backend" class="slide">
+  <div class="eyebrow">04 — Backend</div>
+  <h2>Backend stabilization</h2>
+  <p class="lede">A pair of merges (<code>backend-stabilization</code> #4, #5) introduced two new modules at the heart of the API and hardened uploads against malicious archives.</p>
+
+  <div class="cards">
+    <div class="card">
+      <h3>RBAC at the door</h3>
+      <div class="filepath">qc-dashboard/api/app/security.py (NEW, 90 lines)</div>
+      <ul>
+        <li>Three roles: <code>OPERATOR</code> &lt; <code>REVIEWER</code> &lt; <code>ADMIN</code>.</li>
+        <li>API-key auth driven by env <code>VCBENCH_API_KEYS</code> (format <code>role:key,role:key</code>).</li>
+        <li>FastAPI dependency <code>require_role(*allowed)</code> wired into write endpoints (e.g. <code>POST /qc_metrics</code>, <code>POST /upload/aws</code>, <code>POST /runs/&#123;name&#125;/benchmarking</code>).</li>
+        <li>Local development remains usable with <code>VCBENCH_AUTH_DISABLED=1</code> — shared deployments configure real keys.</li>
+        <li>Includes <code>hash_password</code> built on <code>hashlib</code> with <code>secrets</code>-sourced salt.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Centralised settings</h3>
+      <div class="filepath">qc-dashboard/api/app/settings.py (NEW, 46 lines)</div>
+      <ul>
+        <li>Single import surface for filesystem paths (<code>LAB_RUNS_DIR</code>, <code>PROCESSED_DIR</code>, <code>REFERENCE_DIR</code>, <code>TMP_DIR</code>, <code>UPLOAD_DIR</code>).</li>
+        <li>Reads <code>DATABASE_URL</code> from env, with the production-correct default (port <code>55433</code>).</li>
+        <li>Defines upload-hardening knobs: <code>MAX_UPLOAD_BYTES</code> (20 GB), <code>MAX_ZIP_MEMBERS</code> (5000), <code>MAX_EXTRACTED_BYTES</code> (100 GB).</li>
+        <li>All knobs are env-overridable through <code>VCBENCH_*</code> variables.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Upload hardening</h3>
+      <div class="filepath">qc-dashboard/api/tasks/upload_run.py (+180 lines)</div>
+      <ul>
+        <li>Streaming uploads with explicit byte-count enforcement against <code>MAX_UPLOAD_BYTES</code>.</li>
+        <li>Zip extraction validated against <code>MAX_ZIP_MEMBERS</code> and <code>MAX_EXTRACTED_BYTES</code> — closes the zip-bomb vector.</li>
+        <li>Member paths sanitised so an archive cannot write outside its target directory (path-traversal protection).</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Run lifecycle tracking</h3>
+      <div class="filepath">qc-dashboard/api/tasks/process_run.py (+82 lines)</div>
+      <ul>
+        <li>Background processing now records <code>processing_started_at</code> / <code>processing_completed_at</code> on the run row.</li>
+        <li>Failures persist <code>error_message</code> instead of disappearing silently into logs.</li>
+        <li>Status transitions guarded against double-start.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="migrations" class="slide">
+  <div class="eyebrow">05 — Database</div>
+  <h2>Migrations: ad-hoc SQL → Alembic</h2>
+  <p class="lede">The home-grown migration script was retired in favour of Alembic, the standard SQLAlchemy migration tool. The hand-written runner and one-off SQL file are gone; two Alembic revisions take their place.</p>
+
+  <table>
+    <thead><tr><th></th><th>Then</th><th>Now</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Runner</td>
+        <td><code>migrations/apply_migration.py</code> (custom, 56 lines)</td>
+        <td><code>alembic.ini</code> + <code>migrations/env.py</code> + <code>script.py.mako</code></td>
+      </tr>
+      <tr>
+        <td>Format</td>
+        <td>Raw SQL: <code>001_add_truvari_metrics.sql</code></td>
+        <td>Python revisions in <code>migrations/versions/</code></td>
+      </tr>
+      <tr>
+        <td>Initial state</td>
+        <td>Implicit (created by <code>create_db_tables.py</code>)</td>
+        <td>Explicit revision <code>20260501_0001_initial_schema</code> (143 lines)</td>
+      </tr>
+      <tr>
+        <td>Truvari schema</td>
+        <td>Loose SQL</td>
+        <td>Revision <code>20260501_0002_add_truvari_metrics</code> (56 lines)</td>
+      </tr>
+      <tr>
+        <td>Apply step</td>
+        <td><code>python migrations/apply_migration.py</code></td>
+        <td><code>alembic upgrade head</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 style="margin-top:36px;">Schema deltas on <code>LabRun</code> and metric tables</h2>
+  <pre><span class="ctx">class LabRun(Base):</span>
+<span class="ctx">    id, run_name, status, created_at, approved_at, approved_by_id</span>
+<span class="add">+   updated_at             = Column(DateTime, server_default=func.now(), onupdate=func.now())</span>
+<span class="add">+   processing_started_at  = Column(DateTime, nullable=True)</span>
+<span class="add">+   processing_completed_at = Column(DateTime, nullable=True)</span>
+<span class="add">+   error_message          = Column(Text, nullable=True)</span>
+<span class="ctx"></span>
+<span class="ctx">class QCMetric(Base):</span>
+<span class="del">-   run_id = Column(Integer, ForeignKey("lab_runs.id"))</span>
+<span class="add">+   run_id = Column(Integer, ForeignKey("lab_runs.id", ondelete="CASCADE"))</span>
+<span class="ctx"></span>
+<span class="ctx">class HappyMetric(Base):</span>
+<span class="del">-   run_id = Column(Integer, ForeignKey("lab_runs.id"))</span>
+<span class="add">+   run_id = Column(Integer, ForeignKey("lab_runs.id", ondelete="CASCADE"))</span>
+<span class="ctx"></span>
+<span class="ctx">class TruvariMetric(Base):</span>
+<span class="add">+   __table_args__ = (UniqueConstraint("run_id", name="unique_run_truvari"),)</span></pre>
+  <p>All schema changes are additive. No column was removed. Cascade delete and unique constraint enforce referential integrity that the application was relying on implicitly.</p>
+</section>
+
+<section id="api" class="slide">
+  <div class="eyebrow">06 — API</div>
+  <h2>API surface clean-up</h2>
+  <p>Two latent bugs in the FastAPI routers were resolved during the stabilization pass, alongside the introduction of env-driven configuration in place of hard-coded URLs.</p>
+
+  <div class="theme">
+    <div class="side">
+      <div class="num">Fix A</div>
+      <h3>Double-prefixed paths</h3>
+      <div class="meta">happy_metrics.py, qc_metrics.py</div>
+    </div>
+    <div class="body">
+      <p>Two routers declared their routes with a hard-coded <code>/api/v1/</code> prefix while <em>also</em> being mounted by <code>main.py</code> with <code>prefix="/api/v1"</code>. The effective URLs were <code>/api/v1/api/v1/runs/…</code> — silently unreachable from outside.</p>
+      <pre><span class="del">- @router.post("/api/v1/runs/{run_name}/happy_metrics", …)</span>
+<span class="del">- @router.get("/api/v1/qc_metrics/{run_id}/{metric_name}", …)</span>
+<span class="add">+ @router.post("/runs/{run_name}/happy_metrics", …)</span>
+<span class="add">+ @router.get("/qc_metrics/{run_id}/{metric_name}", …)</span></pre>
+    </div>
+  </div>
+
+  <div class="theme">
+    <div class="side">
+      <div class="num">Fix B</div>
+      <h3>Dead route removed</h3>
+      <div class="meta">runs.py</div>
+    </div>
+    <div class="body">
+      <p>An old <code>@router.get("/runs/&#123;metric_name&#125;")</code> sat after <code>/runs/&#123;run_id&#125;</code> in the same file. FastAPI matches by declaration order, so any request to <code>/runs/&lt;anything&gt;</code> was shadowed by <code>{run_id}</code>. The handler also returned nothing — pure dead code, removed.</p>
+    </div>
+  </div>
+
+  <div class="theme">
+    <div class="side">
+      <div class="num">Fix C</div>
+      <h3>Env-driven base URL</h3>
+      <div class="meta">commit b23454d · dash_app/config.py</div>
+    </div>
+    <div class="body">
+      <p>The Dash client used to hard-code <code>http://localhost:8000/api/v1</code>. The configuration now reads <code>API_HOST</code> and <code>API_PORT</code> from the environment, with sensible defaults, so the same code runs unchanged in dev, staging, and production.</p>
+      <pre><span class="del">- API_BASE_URL = "http://localhost:8000/api/v1"</span>
+<span class="add">+ API_HOST     = os.getenv("API_HOST", "127.0.0.1")</span>
+<span class="add">+ API_PORT     = os.getenv("API_PORT", os.getenv("PORT", "8002"))</span>
+<span class="add">+ API_BASE_URL = os.getenv("API_BASE_URL", f"http://{API_HOST}:{API_PORT}/api/v1")</span></pre>
+    </div>
+  </div>
+
+  <div class="theme">
+    <div class="side">
+      <div class="num">Surface</div>
+      <h3>Final route count</h3>
+      <div class="meta">From OpenAPI spec</div>
+    </div>
+    <div class="body">
+      <p>22 path/method pairs documented via OpenAPI, plus the <code>/ws/download/&#123;sample_id&#125;</code> WebSocket. Every previously documented endpoint is still present; the cleanup is purely <em>making them reachable as advertised</em>.</p>
+    </div>
+  </div>
+</section>
+
+<section id="pipeline" class="slide">
+  <div class="eyebrow">07 — Pipeline</div>
+  <h2>Pipeline hardening</h2>
+  <p>One pipeline script received a security and ergonomics refactor; the rest are byte-identical with the November state.</p>
+
+  <h3><code>pipeline/vcf_filter.py</code> — three improvements</h3>
+  <ul>
+    <li><strong>No more <code>shell=True</code>.</strong> The previous code passed a constructed shell string to <code>subprocess.run(shell=True)</code> — a command-injection vector if a sample name ever contained metacharacters. Replaced with an argv list <code>["bcftools", "query", "-f", "%TYPE\\n", str(vcf_path)]</code>.</li>
+    <li><strong><code>pathlib</code> instead of <code>os.path</code>.</strong> Relative paths replaced with <code>PROCESSED_DIR = Path(__file__).resolve().parents[1] / "data" / "processed"</code>, so the script behaves the same regardless of the caller's CWD.</li>
+    <li><strong>Encapsulated in <code>main()</code>.</strong> Logic that ran at import time now sits inside a function with a guarded <code>__main__</code>, making the module importable and testable.</li>
+  </ul>
+
+  <pre><span class="del">- output_path = os.path.join(PROCESSED_DIR, "variant_summary.tsv")</span>
+<span class="del">- cmd = f'bcftools query -f "%TYPE\\n" {vcf_path} | grep -w "{vtype}" | wc -l'</span>
+<span class="del">- result = subprocess.run(cmd, shell=True, capture_output=True, text=True)</span>
+<span class="add">+ output_path = PROCESSED_DIR / "variant_summary.tsv"</span>
+<span class="add">+ result = subprocess.run(</span>
+<span class="add">+     ["bcftools", "query", "-f", "%TYPE\\n", str(vcf_path)],</span>
+<span class="add">+     check=False, capture_output=True, text=True,</span>
+<span class="add">+ )</span>
+<span class="add">+ pattern = re.compile(rf"\b{re.escape(vtype)}\b")</span>
+<span class="add">+ return sum(1 for line in result.stdout.splitlines() if pattern.search(line))</span></pre>
+</section>
+
+<section id="docs" class="slide">
+  <div class="eyebrow">08 — Docs</div>
+  <h2>Docs overhaul</h2>
+  <p>Three documentation passes landed: a clean README rewrite, the addition of four real screenshots, and an explicit env-vars table and design-system reference.</p>
+
+  <div class="cards">
+    <div class="card">
+      <h3>README rewrite</h3>
+      <div class="filepath">README.md (+382 lines of restructuring)</div>
+      <ul>
+        <li>New sections: <em>Routes</em>, <em>Reference files</em>, <em>API endpoints</em> (table), <em>Configuration</em> (env vars table), <em>Design system</em>, <em>Changelog</em>.</li>
+        <li>Removed the fake support email and broken <code>docs/struct.md</code> reference; corrected the IARC website URL (commit <code>bb9e1d5</code>).</li>
+        <li>Quick start condensed to five concrete steps (one of which still had wrong defaults — that part was patched in the onboarding pass).</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Screenshots</h3>
+      <div class="filepath">docs/images/</div>
+      <ul>
+        <li><code>overview.png</code> — landing page</li>
+        <li><code>dashboard.png</code> — <code>/home</code></li>
+        <li><code>pipeline.png</code> — <code>/runs</code></li>
+        <li><code>truvari.png</code> — <code>/truvari</code></li>
+        <li>Total ≈ 480 KB; rendered at the top of the README.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Env-vars reference</h3>
+      <div class="filepath">README · Configuration section</div>
+      <ul>
+        <li>Documents every <code>VCBENCH_*</code>, <code>API_*</code>, <code>POSTGRES_*</code>, <code>AWS_PROFILE</code> override.</li>
+        <li>Pairs each variable with its purpose and the file that consumes it.</li>
+        <li>Provides a copy-pasteable <code>export</code> block for the common local-dev overrides.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Design system docs</h3>
+      <div class="filepath">README · Design system section</div>
+      <ul>
+        <li>Tokens listed group by group: brand, ink, status, type, spacing, radius, shadow, layout.</li>
+        <li>Primitives listed with their intended use (<code>.action-card</code>, <code>.runs-panel</code>, <code>.alert</code>, …).</li>
+        <li>Accessibility commitments enumerated (Inter, focus-visible, reduced motion, 44 px touch targets, status colour redundancy).</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="commits" class="slide">
+  <div class="eyebrow">09 — Commits</div>
+  <h2>Commits in the window</h2>
+  <p>Ordered chronologically; merge commits omitted. Scope tags follow the repository's convention.</p>
+
+  <div class="commits">
+    <div class="commit">
+      <span class="sha">a4eb020</span>
+      <span class="date">2026-05-01</span>
+      <span class="subject"><span class="scope">style(design)</span>F5 F6 F7 F12 — design tokens overhaul, Inter font stack, status pills, action cards</span>
+    </div>
+    <div class="commit">
+      <span class="sha">b23454d</span>
+      <span class="date">2026-05-01</span>
+      <span class="subject"><span class="scope">fix(api)</span>F1 — env-driven API base URL, drop hardcoded :8000</span>
+    </div>
+    <div class="commit">
+      <span class="sha">e89e5c7</span>
+      <span class="date">2026-05-01</span>
+      <span class="subject"><span class="scope">style(design)</span>F3 F4 F9 F13 — drop emoji nav, fix right rail wrap, restyle upload form</span>
+    </div>
+    <div class="commit">
+      <span class="sha">f399d7a</span>
+      <span class="date">2026-05-01</span>
+      <span class="subject"><span class="scope">fix(ui)</span>/home navigation + upload form polish</span>
+    </div>
+    <div class="commit">
+      <span class="sha">7768b9f</span>
+      <span class="date">2026-05-01</span>
+      <span class="subject"><span class="scope">docs(readme)</span>document env vars, design system, May 2026 changelog</span>
+    </div>
+    <div class="commit">
+      <span class="sha">11b6027</span>
+      <span class="date">2026-05-02</span>
+      <span class="subject"><span class="scope">style(design)</span>/truvari ships shared header + design tokens</span>
+    </div>
+    <div class="commit">
+      <span class="sha">b842bea</span>
+      <span class="date">2026-05-05</span>
+      <span class="subject"><span class="scope">docs(readme)</span>clean rewrite + add page screenshots, drop fake support email</span>
+    </div>
+    <div class="commit">
+      <span class="sha">bb9e1d5</span>
+      <span class="date">2026-05-05</span>
+      <span class="subject"><span class="scope">docs(readme)</span>fix IARC website URL (canceratlantique.ca)</span>
+    </div>
+    <div class="commit">
+      <span class="sha">2e74c4c</span>
+      <span class="date">2026-05-05</span>
+      <span class="subject">stabilize backend workflows</span>
+    </div>
+    <div class="commit">
+      <span class="sha">a33d65d</span>
+      <span class="date">2026-05-05</span>
+      <span class="subject">Tighten pipeline script and docs links</span>
+    </div>
+  </div>
+</section>
+
+<section id="verdict" class="slide">
+  <div class="eyebrow">10 — Verdict</div>
+  <h2>Where this leaves the project</h2>
+
+  <div class="verdict">
+    <div class="bar success"></div>
+    <div>
+      <h3>No feature was removed</h3>
+      <p>Every REST endpoint, dashboard page, pipeline script, and CLI helper from November 2025 still exists in May 2026. Two route signatures changed only because they had been bugged from the start (double prefix); one route was dead code and was removed without behavioural impact.</p>
+    </div>
+  </div>
+
+  <div class="verdict">
+    <div class="bar success"></div>
+    <div>
+      <h3>Schema additions are backward-compatible</h3>
+      <p>Four new columns on <code>LabRun</code>, plus cascade-delete foreign keys on the metric tables. Existing rows continue to read without migration of legacy data; new columns are nullable or have server-side defaults.</p>
+    </div>
+  </div>
+
+  <div class="verdict">
+    <div class="bar info"></div>
+    <div>
+      <h3>The codebase is meaningfully more secure</h3>
+      <p>Three real attack surfaces narrowed: API now defends with role-based keys, uploads cap size/members/extraction (zip bombs and path traversal), and the pipeline drops <code>shell=True</code>. None of these existed in November.</p>
+    </div>
+  </div>
+
+  <div class="verdict">
+    <div class="bar info"></div>
+    <div>
+      <h3>The dashboard is meaningfully more polished</h3>
+      <p>A tokenised design system, Inter typography, focus-visible rings, reduced-motion support, and a coherent set of UI primitives replace the previous ad-hoc styles. Pages share a navigation chrome and behave consistently across breakpoints.</p>
+    </div>
+  </div>
+
+  <div class="verdict">
+    <div class="bar"></div>
+    <div>
+      <h3>Carried-over residue worth a follow-up</h3>
+      <p>The README quick start still had a handful of defaults that didn't match the code (env name, ports, route table) at the end of the May 5th merges — those were the subject of the more recent onboarding pass and are out of scope for this report.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+</div>
+
+<div class="kbd-hint">
+  Navigate: <kbd>J</kbd> next · <kbd>K</kbd> previous · <kbd>G</kbd> top
+</div>
+
+<script>
+(function () {
+  const sections = Array.from(document.querySelectorAll("section.slide"));
+  const links = Array.from(document.querySelectorAll("nav.toc a"));
+
+  // Highlight the section currently in view.
+  const linkById = new Map(links.map(a => [a.getAttribute("href").slice(1), a]));
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      const id = entry.target.id;
+      const link = linkById.get(id);
+      if (!link) return;
+      if (entry.isIntersecting) {
+        links.forEach(l => l.classList.remove("is-active"));
+        link.classList.add("is-active");
+      }
+    });
+  }, { rootMargin: "-30% 0px -60% 0px", threshold: 0 });
+  sections.forEach(s => observer.observe(s));
+
+  // Keyboard navigation: J/K to step between sections, G to jump to top.
+  function currentIndex() {
+    const y = window.scrollY + 80;
+    let idx = 0;
+    sections.forEach((s, i) => { if (s.offsetTop <= y) idx = i; });
+    return idx;
+  }
+  function goTo(idx) {
+    const clamped = Math.max(0, Math.min(sections.length - 1, idx));
+    sections[clamped].scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  document.addEventListener("keydown", (e) => {
+    if (e.target.matches("input, textarea")) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === "j" || e.key === "J" || e.key === "ArrowDown") {
+      e.preventDefault();
+      goTo(currentIndex() + 1);
+    } else if (e.key === "k" || e.key === "K" || e.key === "ArrowUp") {
+      e.preventDefault();
+      goTo(currentIndex() - 1);
+    } else if (e.key === "g" || e.key === "G") {
+      e.preventDefault();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  });
+})();
+</script>
+</body>
+</html>

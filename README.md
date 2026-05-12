@@ -187,7 +187,7 @@ vcbench/
 
 ## API endpoints
 
-Full schema and try-it-out forms live at `/api/docs` (powered by Swagger UI).
+Full schema and try-it-out forms live at `/docs` (powered by Swagger UI).
 
 ### Run management
 
@@ -205,7 +205,7 @@ Full schema and try-it-out forms live at `/api/docs` (powered by Swagger UI).
 |--------|----------------------------------------------------|------------------------------------------|
 | GET    | `/api/v1/runs/{run_name}/happy_metrics`            | hap.py results                           |
 | GET    | `/api/v1/runs/{run_name}/truvari_metrics`          | Truvari results                          |
-| GET    | `/api/v1/qc-metrics`                               | General QC metrics                       |
+| GET    | `/api/v1/qc_metrics/{run_id}/{metric_name}`        | Single QC metric value for a run         |
 | GET    | `/api/v1/dash/samples/{file_type}`                 | Samples available for a metric category  |
 | GET    | `/api/v1/dash/data/{file_type}`                    | Metric values across samples             |
 
