@@ -482,6 +482,7 @@ kbd {
     <li><a href="#pipeline">Pipeline hardening</a></li>
     <li><a href="#docs">Docs overhaul</a></li>
     <li><a href="#commits">Commits in the window</a></li>
+    <li><a href="#runtime-fixes">Pipeline runtime fixes</a></li>
     <li><a href="#verdict">Verdict</a></li>
   </ol>
   <div class="meta">
@@ -944,8 +945,51 @@ kbd {
   </div>
 </section>
 
+<section id="runtime-fixes" class="slide">
+  <div class="eyebrow">10 — Runtime fixes</div>
+  <h2>Pipeline runtime fixes (May 2026)</h2>
+  <p class="lede">Two latent bugs surfaced only during a full end-to-end test on GIAB NA24143 (chr22). Both were blocking any execution; neither showed up in static review.</p>
+
+  <div class="cards">
+    <div class="card">
+      <h3><code>pipeline/happy.sh</code> — obsolete Docker image</h3>
+      <p>The pipeline pulled <code>pkrusche/hap.py:latest</code>, an image stored in Docker manifest v1 schema 1 — a format Docker removed support for in 2024. <code>docker pull</code> now fails outright on any machine without a stale local cache:</p>
+      <pre>Docker Image Format v1 and Docker Image manifest version 2
+schema 1 support has been removed.</pre>
+      <p><strong>Fix:</strong> switch to the bioconda image <code>quay.io/biocontainers/hap.py:0.3.15--py27hcb73b3d_0</code>, expose all resource knobs as env vars (<code>HAPPY_IMAGE</code>, <code>HAPPY_MEMORY</code>, <code>HAPPY_MEMORY_SWAP</code>, <code>HAPPY_PLATFORM</code>, <code>HAPPY_CPUS</code>) so dev machines can shrink memory without forking the script, and pin <code>--platform linux/amd64</code> for Apple Silicon (the image is x86 only).</p>
+      <pre><span class="del">- pkrusche/hap.py:latest
+- /opt/hap.py/bin/hap.py</span>
+<span class="add">+ HAPPY_IMAGE="${HAPPY_IMAGE:-quay.io/biocontainers/hap.py:0.3.15--py27hcb73b3d_0}"
++ --platform "$HAPPY_PLATFORM"  # linux/amd64
++ hap.py                         # binary on $PATH</span></pre>
+    </div>
+
+    <div class="card">
+      <h3><code>process_run.py</code> — mismatched output paths</h3>
+      <p>hap.py was invoked with <code>-o /wgs/data/<strong>lab_runs</strong>/…</code> but <code>post_happy_metrics()</code> looked for the summary CSV under <code>/wgs/data/<strong>processed</strong>/&lt;date&gt;_&lt;run&gt;/</code>. The subprocess succeeded, then the metric parser failed with:</p>
+      <pre>Successfully processed R001 …
+↓
+FAILED: No summary file found in
+  data/processed/20260512_NA24143_…/</pre>
+      <p><strong>Fix:</strong> align <code>docker_out_dir</code> and <code>docker_logfile</code> on the <code>out_dir_path</code> already computed earlier in the function.</p>
+      <pre><span class="del">- docker_out_dir = '/wgs/data/lab_runs/{sample}_{run}/{sample}_{run}'
+- docker_logfile = '/wgs/data/lab_runs/{sample}_{run}/happy.{sample}.{run}.log'</span>
+<span class="add">+ docker_out_dir = '/wgs/data/processed/{run_dir_name}/{sample}_{run}'
++ docker_logfile = '/wgs/data/processed/{run_dir_name}/happy.{sample}.{run}.log'</span></pre>
+    </div>
+  </div>
+
+  <h3>Why neither bug was visible before</h3>
+  <ul>
+    <li><strong>happy.sh:</strong> the pkrusche image kept working as long as it was already cached locally. On any machine that pulled fresh after Docker dropped v1 support, the pipeline broke at <code>docker pull</code>. No CI was exercising the cold-pull path.</li>
+    <li><strong>process_run.py:</strong> the bad <code>docker_out_dir</code> only mattered when hap.py actually <em>completed</em> — and hap.py never reached that point because of the image bug. A classic dependency-hidden defect.</li>
+  </ul>
+
+  <p style="font-size: 13px; color: var(--dusk); margin-top: 12px;">Validation: full pipeline (upload + hap.py + Truvari + CSV reformat) ran in <strong>34.9 s</strong> on chr22 NA24143 data, with F1 = 1.0 on SNPs, INDELs and SVs.</p>
+</section>
+
 <section id="verdict" class="slide">
-  <div class="eyebrow">10 — Verdict</div>
+  <div class="eyebrow">11 — Verdict</div>
   <h2>Where this leaves the project</h2>
 
   <div class="verdict">

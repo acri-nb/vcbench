@@ -12,3 +12,6 @@ __pycache__/
 /emedgene_report/json_output_emedgene.json
 /emedgene_report/clinical_report.pdf
 /qc-dashboard/api/app/test
+/test-fixtures/
+/.claude/
+truvari.log
