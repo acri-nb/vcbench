@@ -301,7 +301,7 @@ def upload_form():
                 font-size: 14px;
                 font-weight: 400;
             }
-            input[type="text"], input[type="file"] {
+            input[type="text"] {
                 width: 100%;
                 min-height: 40px;
                 padding: 8px 10px;
@@ -312,8 +312,59 @@ def upload_form():
                 background: var(--color-parchment);
                 font: inherit;
             }
-            input[type="file"] {
-                padding: 7px 10px;
+            .file-input {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                min-height: 40px;
+                padding: 4px 4px 4px 4px;
+                border: 1px solid rgba(39, 37, 30, 0.16);
+                border-radius: 8px;
+                background: var(--color-parchment);
+            }
+            .file-input__button {
+                appearance: none;
+                border: none;
+                background: var(--color-graphite);
+                color: var(--color-paper-white);
+                padding: 0 14px;
+                min-height: 32px;
+                border-radius: 6px;
+                font: inherit;
+                font-size: 13px;
+                font-weight: 500;
+                cursor: pointer;
+                white-space: nowrap;
+            }
+            .file-input__button:hover {
+                background: var(--color-inkwell);
+            }
+            .file-input__button:focus-visible {
+                outline: 2px solid var(--color-inkwell);
+                outline-offset: 2px;
+            }
+            .file-input__name {
+                flex: 1;
+                min-width: 0;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                color: var(--color-dusk-gray);
+                font-size: 13px;
+            }
+            .file-input.has-file .file-input__name {
+                color: var(--color-graphite);
+            }
+            .visually-hidden {
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                padding: 0;
+                margin: -1px;
+                overflow: hidden;
+                clip: rect(0, 0, 0, 0);
+                white-space: nowrap;
+                border: 0;
             }
             .checkbox-group {
                 display: flex;
@@ -393,8 +444,12 @@ def upload_form():
                     </div>
 
                     <div class="form-group">
-                        <label for="file">Run archive</label>
-                        <input type="file" id="file" name="file" accept=".zip" required>
+                        <label for="file" id="file-label">Run archive</label>
+                        <div class="file-input" id="file-input">
+                            <button type="button" class="file-input__button" id="file-pick-btn">Choose file</button>
+                            <span class="file-input__name" id="file-name">No file selected</span>
+                            <input type="file" id="file" name="file" accept=".zip" required class="visually-hidden" aria-labelledby="file-label">
+                        </div>
                     </div>
 
                     <div class="form-group form-group--wide">
@@ -445,6 +500,24 @@ def upload_form():
                 stratified.disabled = !this.checked;
                 if (!this.checked) {
                     stratified.checked = false;
+                }
+            });
+
+            // File picker: click the visible button to open the hidden input,
+            // and reflect the chosen file name in the label.
+            const fileInput = document.getElementById('file');
+            const fileName = document.getElementById('file-name');
+            const fileGroup = document.getElementById('file-input');
+            document.getElementById('file-pick-btn').addEventListener('click', function() {
+                fileInput.click();
+            });
+            fileInput.addEventListener('change', function() {
+                if (this.files && this.files.length > 0) {
+                    fileName.textContent = this.files[0].name;
+                    fileGroup.classList.add('has-file');
+                } else {
+                    fileName.textContent = 'No file selected';
+                    fileGroup.classList.remove('has-file');
                 }
             });
 

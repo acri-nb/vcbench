@@ -22,20 +22,32 @@ This directory contains Docker configurations for running bioinformatics tools a
 - Pre-built image: `pkrusche/hap.py:latest`
 - Requires high memory (48GB limit)
 
-### bcftools
-**BCFtools** - VCF/BCF manipulation utilities
-- Image: `quay.io/biocontainers/bcftools:1.18--h8b37899_0`
-- Lightweight utility container
-
-### multiqc
-**MultiQC** - Quality control report aggregation
-- Image: `multiqc/multiqc:v1.19`
-- Generates comprehensive QC reports
-
 ### db
 **PostgreSQL** - Database for storing analysis results
 - Image: `postgres:16-alpine`
 - Persistent data storage with health checks
+- **The only service started by `docker compose up -d`.** The application
+  itself shells out to a local `bcftools` binary on `$PATH`
+  (installed via `setup_environment.sh` on macOS).
+
+### bcftools *(profile: `tools`)*
+**BCFtools** - on-demand container for ad-hoc VCF/BCF manipulation
+- Image: `biocontainers/bcftools:v1.9-1-deb_cv1`
+- Not used by the application at runtime; the Python pipeline calls the
+  local `bcftools` binary
+- Start ad-hoc:
+  ```bash
+  docker compose --profile tools run --rm bcftools bcftools view file.vcf.gz
+  ```
+
+### multiqc *(profile: `tools`)*
+**MultiQC** - on-demand container for QC report aggregation
+- Image: `multiqc/multiqc:v1.19`
+- Not invoked by the application; useful for manual report generation
+- Start ad-hoc:
+  ```bash
+  docker compose --profile tools run --rm multiqc multiqc /wgs/data
+  ```
 
 ## Common Issues and Solutions
 

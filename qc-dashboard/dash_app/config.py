@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 API_HOST = os.getenv("API_HOST", "127.0.0.1")
-API_PORT = os.getenv("API_PORT", os.getenv("PORT", "8000"))
+API_PORT = os.getenv("API_PORT", os.getenv("PORT", "8002"))
 API_BASE_URL = os.getenv("API_BASE_URL", f"http://{API_HOST}:{API_PORT}/api/v1")
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent.parent

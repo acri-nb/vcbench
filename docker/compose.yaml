@@ -19,23 +19,28 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # bcftools - Essential bioinformatics tool
+  # bcftools - on-demand container for ad-hoc VCF manipulation.
+  # The application uses the local `bcftools` binary (see setup_environment.sh);
+  # this service is only started under the `tools` profile, e.g.:
+  #   docker compose --profile tools run --rm bcftools bcftools view file.vcf.gz
   bcftools:
     image: biocontainers/bcftools:v1.9-1-deb_cv1
     platform: linux/amd64  # Specify platform for M1/M2 Macs
     volumes:
       - ../:/wgs
     working_dir: /wgs
-    restart: unless-stopped
+    profiles: ["tools"]
 
-  # MultiQC - Quality control reporting (optional)
+  # MultiQC - on-demand container for QC report aggregation. Not used by the
+  # application; kept here for ad-hoc invocations under the `tools` profile:
+  #   docker compose --profile tools run --rm multiqc multiqc /wgs/data
   multiqc:
     image: multiqc/multiqc:v1.19
     platform: linux/amd64  # Specify platform for M1/M2 Macs
     volumes:
       - ../:/wgs
     working_dir: /wgs
-    restart: unless-stopped
+    profiles: ["tools"]
 
   # RTG Tools - Comment out until Dockerfile.rtg is properly configured
   # rtg:
