@@ -58,18 +58,22 @@ cd vcbench
 
 # 2. Conda environment
 conda env create -f environment.yml
-conda activate bioinfo
-# (alternative: ./setup_environment.sh)
+conda activate vcbench
+# (alternative: ./setup_environment.sh — creates a local ./.venv instead)
 
-# 3. Start PostgreSQL (and the bioinformatics images)
+# 3. Start PostgreSQL (the only service the app needs at runtime)
 cd docker && docker compose up -d && cd ..
+# Optional: ad-hoc bcftools/multiqc tool containers live under the `tools`
+# profile — see docker/README.md.
 
-# 4. Initialise the database
+# 4. Initialise the database (stays in qc-dashboard for the next step)
 cd qc-dashboard && python init_db.py
 
 # 5. Launch the API + dashboard
 ./start_app.sh
 ```
+
+`start_app.sh` picks up the active conda env automatically (via `$CONDA_PREFIX`); if you used `setup_environment.sh` instead, it falls back to `./.venv/bin/python`. Override with `PYTHON_BIN=/path/to/python ./start_app.sh` if needed.
 
 The application is then available at <http://localhost:8002> (OpenAPI docs at <http://localhost:8002/docs>).
 
@@ -87,7 +91,7 @@ The Dash UI is mounted inside FastAPI via `WSGIMiddleware`, so a single uvicorn 
 | `/truvari`            | Structural-variant benchmarking results                              |
 | `/api/v1/*`           | REST API (runs, hap.py / Truvari metrics, uploads, dash, downloads)  |
 | `/api/v1/upload/form` | Embeddable upload form (used as an `<iframe>` inside `/runs`)        |
-| `/api/docs`           | Interactive OpenAPI documentation                                    |
+| `/docs`               | Interactive OpenAPI documentation (Swagger UI)                       |
 
 ---
 
@@ -223,7 +227,7 @@ All variables are optional and default to values that match `docker/compose.yaml
 
 | Variable          | Default                                                            | Purpose                                                          |
 |-------------------|--------------------------------------------------------------------|------------------------------------------------------------------|
-| `DATABASE_URL`    | `postgresql+psycopg2://wgs_user:password@localhost:5433/wgs`       | SQLAlchemy URL used by the API and `init_db.py`                  |
+| `DATABASE_URL`    | `postgresql+psycopg2://wgs_user:password@localhost:55433/wgs`      | SQLAlchemy URL used by the API and `init_db.py` (host port matches `docker/compose.yaml`; override with `POSTGRES_HOST_PORT`) |
 | `API_HOST`        | `127.0.0.1`                                                        | Host used by `dash_app/config.py` to compose `API_BASE_URL`      |
 | `API_PORT`        | `8002`                                                             | Port used by `dash_app/config.py` to compose `API_BASE_URL`      |
 | `LAB_RUNS_DIR`    | `<project>/data/lab_runs`                                          | Raw uploaded run archives                                        |
@@ -234,7 +238,7 @@ All variables are optional and default to values that match `docker/compose.yaml
 Example overrides:
 
 ```bash
-export DATABASE_URL="postgresql+psycopg2://wgs_user:password@localhost:5433/wgs"
+export DATABASE_URL="postgresql+psycopg2://wgs_user:password@localhost:55433/wgs"
 export API_HOST="127.0.0.1"
 export API_PORT="8002"
 ```
