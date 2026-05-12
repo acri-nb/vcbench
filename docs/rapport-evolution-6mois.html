@@ -167,7 +167,7 @@
 
 <!-- 2. SYNTHESE -->
 <section class="slide" id="s2">
-  <div class="counter">02 / 10</div>
+  <div class="counter">02 / 11</div>
   <h2>Synthèse</h2>
   <p class="lede">Évolution <strong>purement additive ou correctrice</strong>. Aucune fonctionnalité documentée en novembre n'a disparu.</p>
 
@@ -191,7 +191,7 @@
 
 <!-- 3. WORKFLOW COMPLET (diagramme) -->
 <section class="slide" id="s3">
-  <div class="counter">03 / 10</div>
+  <div class="counter">03 / 11</div>
   <h2>Workflow complet</h2>
   <p class="lede">De l'arrivée d'un échantillon DRAGEN à la consultation des métriques dans le navigateur.</p>
 
@@ -291,7 +291,7 @@
 
 <!-- 4. ARCHITECTURE -->
 <section class="slide" id="s4">
-  <div class="counter">04 / 10</div>
+  <div class="counter">04 / 11</div>
   <h2>Architecture du process</h2>
   <p class="lede">L'application est <strong>un seul process Python</strong> qui sert à la fois l'API REST FastAPI et l'app Dash via <code>WSGIMiddleware</code>.</p>
 
@@ -350,7 +350,7 @@
 
 <!-- 5. API BUGS URL -->
 <section class="slide" id="s5">
-  <div class="counter">05 / 10</div>
+  <div class="counter">05 / 11</div>
   <h2>API — corrections d'URL silencieuses</h2>
   <p class="lede">Deux routers déclaraient leurs paths avec un préfixe <code>/api/v1/</code> alors qu'ils étaient déjà montés avec ce préfixe. Les URLs documentées renvoyaient 404.</p>
 
@@ -391,7 +391,7 @@ app.include_router(happy_metrics.router,
 
 <!-- 6. DB SCHEMA -->
 <section class="slide" id="s6">
-  <div class="counter">06 / 10</div>
+  <div class="counter">06 / 11</div>
   <h2>Base de données — évolutions additives</h2>
   <p class="lede">Aucun champ supprimé. Quatre colonnes ajoutées sur <code>LabRun</code> pour tracer le cycle de vie d'un run, et <code>ON DELETE CASCADE</code> sur les FK pour la cohérence référentielle.</p>
 
@@ -477,7 +477,7 @@ app.include_router(happy_metrics.router,
 
 <!-- 7. PIPELINE -->
 <section class="slide" id="s7">
-  <div class="counter">07 / 10</div>
+  <div class="counter">07 / 11</div>
   <h2>Pipeline — refactor <code>vcf_filter.py</code></h2>
   <p class="lede">Seul script du <code>pipeline/</code> à avoir bougé. Refactor cosmétique <strong>et</strong> correctif sécurité.</p>
 
@@ -531,7 +531,7 @@ def count_variants_by_type(vcf_path, vtype):
 
 <!-- 8. FRONTEND UI -->
 <section class="slide" id="s8">
-  <div class="counter">08 / 10</div>
+  <div class="counter">08 / 11</div>
   <h2>Frontend — refonte UI tokenisée</h2>
   <p class="lede">Toutes les pages Dash partagent désormais un système de design unifié déclaré dans <code>dash_app/assets/style.css</code>.</p>
 
@@ -575,7 +575,7 @@ def count_variants_by_type(vcf_path, vtype):
 
 <!-- 9. SECURITY + MIGRATIONS -->
 <section class="slide" id="s9">
-  <div class="counter">09 / 10</div>
+  <div class="counter">09 / 11</div>
   <h2>Sécurité + migrations</h2>
 
   <div class="cols">
@@ -628,9 +628,54 @@ API_KEYS = os.getenv(
   </div>
 </section>
 
-<!-- 10. VERDICT -->
+<!-- 10. RUNTIME BUGS FIXED -->
 <section class="slide" id="s10">
-  <div class="counter">10 / 10</div>
+  <div class="counter">10 / 11</div>
+  <h2>Pipeline — deux bugs runtime corrigés (mai 2026)</h2>
+  <p class="lede">Découverts pendant un <strong>test end-to-end de bout en bout</strong> sur GIAB NA24143 (chr22). Bloquaient toute exécution; n'apparaissaient pas à l'inspection statique.</p>
+
+  <div class="cols">
+    <div>
+      <h3><code>pipeline/happy.sh</code> — image Docker obsolète</h3>
+      <p>L'image <code>pkrusche/hap.py:latest</code> utilise un manifest Docker v1 schema 1, format retiré par Docker en 2024. <code>docker pull</code> échoue :</p>
+      <pre><code>Docker Image Format v1 and manifest version 2
+schema 1 support has been removed.</code></pre>
+      <p><strong>Fix :</strong> bascule vers l'image bioconda <code>quay.io/biocontainers/hap.py:0.3.15</code>, paramètres ressources rendus configurables via env vars (<code>HAPPY_IMAGE</code>, <code>HAPPY_MEMORY</code>, <code>HAPPY_PLATFORM</code>…).</p>
+      <pre class="diff"><code><span class="del">- pkrusche/hap.py:latest
+- /opt/hap.py/bin/hap.py</span>
+<span class="add">+ HAPPY_IMAGE="${HAPPY_IMAGE:-quay.io/
++   biocontainers/hap.py:0.3.15--py27hcb73b3d_0}"
++ --platform "$HAPPY_PLATFORM"  # linux/amd64
++ hap.py  # binaire sur $PATH</span></code></pre>
+    </div>
+
+    <div>
+      <h3><code>process_run.py</code> — répertoire de sortie incohérent</h3>
+      <p>Hap.py recevait <code>-o /wgs/data/<strong>lab_runs</strong>/…</code> mais <code>post_happy_metrics()</code> cherchait le <code>summary.csv</code> sous <code>/wgs/data/<strong>processed</strong>/&lt;date&gt;_&lt;run&gt;/</code>. Conséquence :</p>
+      <pre><code>Successfully processed R001 ...
+↓
+FAILED: No summary file found in
+  data/processed/20260512_NA24143_…/</code></pre>
+      <p><strong>Fix :</strong> aligner <code>docker_out_dir</code> et <code>docker_logfile</code> sur le <code>out_dir_path</code> calculé plus haut.</p>
+      <pre class="diff"><code><span class="del">- docker_out_dir = '/wgs/data/lab_runs/
+-   {sample}_{run}/{sample}_{run}'</span>
+<span class="add">+ docker_out_dir = '/wgs/data/processed/
++   {run_dir_name}/{sample}_{run}'</span></code></pre>
+    </div>
+  </div>
+
+  <h3>Pourquoi ces bugs étaient invisibles avant ce test</h3>
+  <ul>
+    <li><strong>happy.sh</strong> : l'image pkrusche fonctionnait encore tant qu'elle était <em>déjà en cache local</em>. Sur une machine fraîche post-retrait Docker v1, le pull plante. Aucune CI ne testait cela.</li>
+    <li><strong>process_run.py</strong> : la branche du code n'était exercée que quand hap.py <em>réussissait</em> — et hap.py ne s'exécutait jamais à cause du bug #1. Effet domino classique.</li>
+  </ul>
+
+  <p style="font-size: 13px; color: var(--dusk); margin-top: 12px;">Validation : pipeline complète (upload + hap.py + Truvari + CSV reformat) en <strong>34.9 s</strong> sur chr22 NA24143, F1 = 1.0 sur SNP / INDEL / SV.</p>
+</section>
+
+<!-- 11. VERDICT -->
+<section class="slide" id="s11">
+  <div class="counter">11 / 11</div>
   <h2>Verdict — aucune régression</h2>
 
   <div class="diagram">
