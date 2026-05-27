@@ -276,8 +276,8 @@ def process_happy(sample, run, stratified=False):
     docker_run_gvcf = f'/wgs/data/lab_runs/{sample}_{run}/{filtered_gvcf.name}'
     docker_ref_bed = f'/wgs/data/reference/{base_sample}/{ref_bed.name}'
     docker_ref_fasta = f'/wgs/data/reference/{ref_fasta.name}'
-    docker_out_dir = f'/wgs/data/lab_runs/{sample}_{run}/{sample}_{run}'
-    docker_logfile = f'/wgs/data/lab_runs/{sample}_{run}/happy.{sample}.{run}.log'
+    docker_out_dir = f'/wgs/data/processed/{run_dir_name}/{sample}_{run}'
+    docker_logfile = f'/wgs/data/processed/{run_dir_name}/happy.{sample}.{run}.log'
     happy_script = PROJECT_ROOT / 'pipeline' / 'happy.sh'
     
     logger.info(f"Running hap.py with reference from {base_sample}")

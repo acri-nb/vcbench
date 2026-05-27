@@ -19,23 +19,24 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # bcftools - Essential bioinformatics tool (try ARM64 first)
+  # bcftools - on-demand container under the `tools` profile.
+  # See ../compose.yaml for usage notes.
   bcftools:
     image: biocontainers/bcftools:v1.9-1-deb_cv1
     platform: linux/arm64  # Try native ARM64 first
     volumes:
       - ../:/wgs
     working_dir: /wgs
-    restart: unless-stopped
+    profiles: ["tools"]
 
-  # MultiQC - Quality control reporting (try ARM64 first)
+  # MultiQC - on-demand container under the `tools` profile.
   multiqc:
     image: multiqc/multiqc:v1.19
     platform: linux/arm64  # Try native ARM64 first
     volumes:
       - ../:/wgs
     working_dir: /wgs
-    restart: unless-stopped
+    profiles: ["tools"]
 
   # RTG Tools - Comment out until Dockerfile.rtg is properly configured
   # rtg:

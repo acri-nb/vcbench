@@ -14,3 +14,6 @@ __pycache__/
 /qc-dashboard/api/app/test
 /qc-dashboard/api/app/tmp/
 /.superpowers/
+/test-fixtures/
+/.claude/
+truvari.log

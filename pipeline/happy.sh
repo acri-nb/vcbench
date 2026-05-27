@@ -11,23 +11,36 @@ docker_out_dir="$6"
 docker_logfile="$7"
 shift 7  # shift the first 7 positional args so "$@" becomes remaining args (e.g., --stratification ...)
 
+# Image bioconda (pkrusche/hap.py:latest a un manifest Docker v1 retiré).
+# Override via HAPPY_IMAGE si une autre image est nécessaire.
+HAPPY_IMAGE="${HAPPY_IMAGE:-quay.io/biocontainers/hap.py:0.3.15--py27hcb73b3d_0}"
+
+# Limites ressources — sensibles pour WGS humain entier. Override pour dev/CI
+# où la machine est plus petite (ex. HAPPY_MEMORY=8g sur un Mac dev).
+HAPPY_CPUS="${HAPPY_CPUS:-6}"
+HAPPY_MEMORY="${HAPPY_MEMORY:-48g}"
+HAPPY_MEMORY_SWAP="${HAPPY_MEMORY_SWAP:-56g}"
+
+# Plateforme : forcer linux/amd64 sur Apple Silicon (l'image est x86 only).
+HAPPY_PLATFORM="${HAPPY_PLATFORM:-linux/amd64}"
+
 # Run hap.py with proper Docker settings
 docker run \
     --rm \
-    --cpus=6 \
-    --memory=48g \
-    --memory-swap=56g \
-    -e RTG_MEM=24g \
+    --platform "$HAPPY_PLATFORM" \
+    --cpus="$HAPPY_CPUS" \
+    --memory="$HAPPY_MEMORY" \
+    --memory-swap="$HAPPY_MEMORY_SWAP" \
     -e HGREF=/wgs/data/reference/GCA_000001405.15_GRCh38_no_alt_analysis_set.fasta \
     -v "$(pwd):/wgs" \
-    pkrusche/hap.py:latest \
-    /opt/hap.py/bin/hap.py \
+    "$HAPPY_IMAGE" \
+    hap.py \
     "${docker_ref_vcf}" \
     "${docker_run_gvcf}" \
     --engine xcmp \
     --pass-only \
     --logfile "${docker_logfile}" \
-    --threads 6 \
+    --threads "$HAPPY_CPUS" \
     -f "${docker_ref_bed}" \
     -r /wgs/data/reference/GCA_000001405.15_GRCh38_no_alt_analysis_set.fasta \
     -o "${docker_out_dir}" \
