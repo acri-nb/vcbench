@@ -506,6 +506,227 @@ table th:nth-child(3), table td:nth-child(3) { width: 60%; }
 .alert-warning { background: var(--vc-warn-100);    color: var(--vc-warn-700);    border-color: var(--vc-warn-500); }
 
 /* ============================================================
+   Transfer monitoring
+   ============================================================ */
+.monitoring-page {
+  color: var(--vc-ink-900);
+}
+
+.monitoring-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--vc-s-4);
+  margin-bottom: var(--vc-s-5);
+}
+
+.monitoring-subtitle {
+  color: var(--vc-ink-500);
+  font-size: var(--vc-fs-sm);
+  max-width: 64ch;
+}
+
+.monitoring-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--vc-s-3);
+  margin-bottom: var(--vc-s-5);
+}
+
+.summary-card {
+  background: var(--vc-surface);
+  border: 1px solid var(--vc-border);
+  border-left: 4px solid var(--vc-ink-300);
+  border-radius: var(--vc-r-md);
+  padding: var(--vc-s-4);
+  box-shadow: var(--vc-shadow-sm);
+}
+.summary-card-running { border-left-color: #0f766e; }
+.summary-card-queued { border-left-color: #2563eb; }
+.summary-card-failed { border-left-color: var(--vc-danger-500); }
+
+.summary-label {
+  color: var(--vc-ink-500);
+  font-size: var(--vc-fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.summary-value {
+  color: var(--vc-ink-900);
+  font-size: 1.45rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  margin-top: var(--vc-s-1);
+}
+.summary-caption {
+  color: var(--vc-ink-500);
+  font-size: var(--vc-fs-xs);
+}
+
+.monitoring-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 180px) minmax(0, 180px) minmax(0, 1fr);
+  gap: var(--vc-s-3);
+  align-items: end;
+  margin-bottom: var(--vc-s-4);
+}
+.monitoring-filter label {
+  display: block;
+  margin-bottom: var(--vc-s-2);
+  color: var(--vc-ink-700);
+  font-size: var(--vc-fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.monitoring-panel {
+  background: var(--vc-surface);
+  border: 1px solid var(--vc-border);
+  border-radius: var(--vc-r-md);
+  box-shadow: var(--vc-shadow-sm);
+  margin-bottom: var(--vc-s-4);
+  overflow: hidden;
+}
+.monitoring-panel > .empty-state,
+.monitoring-panel > .error-state {
+  margin: var(--vc-s-4);
+}
+
+.monitoring-table th,
+.monitoring-table td {
+  width: auto !important;
+}
+.monitoring-table .job-subject {
+  color: var(--vc-ink-900);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.monitoring-table .job-id {
+  color: var(--vc-ink-500);
+  font-family: var(--vc-font-mono);
+  font-size: var(--vc-fs-xs);
+  margin-top: 2px;
+}
+
+.job-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: var(--vc-fs-xs);
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.job-status-queued { color: #1e3a8a; background: #dbeafe; }
+.job-status-running { color: #134e4a; background: #ccfbf1; }
+.job-status-completed { color: #14532d; background: #dcfce7; }
+.job-status-failed { color: #7f1d1d; background: #fee2e2; }
+.job-status-canceled { color: #374151; background: #e5e7eb; }
+
+.progress-cell {
+  min-width: 180px;
+}
+.progress-track {
+  height: 8px;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--vc-ink-100);
+}
+.progress-track > div {
+  height: 100%;
+  min-width: 2px;
+  border-radius: inherit;
+  background: #0f766e;
+}
+.progress-caption {
+  margin-top: var(--vc-s-1);
+  color: var(--vc-ink-500);
+  font-size: var(--vc-fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.monitoring-detail-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--vc-s-4);
+  align-items: flex-start;
+  padding: var(--vc-s-4);
+  border-bottom: 1px solid var(--vc-border);
+}
+.monitoring-detail-title {
+  color: var(--vc-ink-900);
+  font-size: var(--vc-fs-lg);
+  font-weight: 750;
+}
+.monitoring-detail-id {
+  color: var(--vc-ink-500);
+  font-family: var(--vc-font-mono);
+  font-size: var(--vc-fs-xs);
+}
+.monitoring-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--vc-s-3);
+  padding: var(--vc-s-4);
+}
+.detail-item {
+  border: 1px solid var(--vc-border);
+  border-radius: var(--vc-r-sm);
+  padding: var(--vc-s-3);
+  background: #fbfcfe;
+}
+.detail-label {
+  color: var(--vc-ink-500);
+  font-size: var(--vc-fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.detail-value {
+  color: var(--vc-ink-900);
+  font-size: var(--vc-fs-sm);
+  overflow-wrap: anywhere;
+}
+
+.monitoring-log {
+  max-height: 360px;
+  overflow: auto;
+  margin: 0 var(--vc-s-4) var(--vc-s-4);
+  padding: var(--vc-s-3);
+  border-radius: var(--vc-r-md);
+  background: #111827;
+  color: #e5e7eb;
+  font-family: var(--vc-font-mono);
+  font-size: var(--vc-fs-xs);
+  line-height: 1.55;
+}
+.log-line {
+  display: grid;
+  grid-template-columns: 72px 80px minmax(0, 1fr);
+  gap: var(--vc-s-2);
+  padding: 2px 0;
+}
+.log-time { color: #9ca3af; }
+.log-level {
+  font-weight: 750;
+  text-transform: uppercase;
+}
+.log-level-info { color: #d1d5db; }
+.log-level-progress { color: #93c5fd; }
+.log-level-success { color: #86efac; }
+.log-level-warning { color: #fcd34d; }
+.log-level-error { color: #fca5a5; }
+.log-message {
+  color: #f9fafb;
+  overflow-wrap: anywhere;
+}
+
+/* ============================================================
    Charts
    ============================================================ */
 .section-container {
@@ -522,6 +743,10 @@ table th:nth-child(3), table td:nth-child(3) { width: 60%; }
    ============================================================ */
 @media (max-width: 900px) {
   .action-grid { grid-template-columns: 1fr; }
+  .monitoring-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .monitoring-filters { grid-template-columns: 1fr; }
+  .monitoring-detail-grid { grid-template-columns: 1fr; }
+  .log-line { grid-template-columns: 68px 72px minmax(0, 1fr); }
   .index-hero { padding: var(--vc-s-6) var(--vc-s-4) var(--vc-s-5); }
   .index-hero h2 { font-size: var(--vc-fs-2xl); }
   header.site-header { height: auto; padding: var(--vc-s-3) var(--vc-s-4); flex-wrap: wrap; gap: var(--vc-s-2); }
