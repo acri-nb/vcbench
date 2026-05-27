@@ -452,6 +452,29 @@ def upload_form():
                 border-radius: 8px;
                 color: var(--color-graphite);
             }
+            .progress-track {
+                height: 10px;
+                width: 100%;
+                background: rgba(39, 37, 30, 0.12);
+                border-radius: 999px;
+                overflow: hidden;
+                margin: 12px 0 8px;
+            }
+            .progress-fill {
+                height: 100%;
+                width: 0%;
+                background: #0f766e;
+                border-radius: inherit;
+                transition: width 0.15s ease;
+            }
+            .progress-meta {
+                display: flex;
+                justify-content: space-between;
+                gap: 12px;
+                color: var(--color-dusk-gray);
+                font-size: 13px;
+                font-variant-numeric: tabular-nums;
+            }
             .success {
                 margin-top: 15px;
                 padding: 15px;
@@ -526,6 +549,13 @@ def upload_form():
             <div id="progress" class="progress">
                 <h4>Upload in progress</h4>
                 <p>Please wait while the archive is uploaded.</p>
+                <div class="progress-track">
+                    <div id="progressFill" class="progress-fill"></div>
+                </div>
+                <div class="progress-meta">
+                    <span id="progressPercent">0%</span>
+                    <span id="progressBytes">Waiting to start</span>
+                </div>
             </div>
 
             <div id="result"></div>
@@ -541,7 +571,35 @@ def upload_form():
                 }
             });
 
-            // Handle form submission with progress indicator
+            function formatBytes(value) {
+                const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+                let amount = Number(value || 0);
+                for (const unit of units) {
+                    if (amount < 1024 || unit === units[units.length - 1]) {
+                        return unit === 'B' ? `${Math.round(amount)} B` : `${amount.toFixed(1)} ${unit}`;
+                    }
+                    amount = amount / 1024;
+                }
+                return `${value} B`;
+            }
+
+            function setProgress(loaded, total) {
+                const fill = document.getElementById('progressFill');
+                const percent = document.getElementById('progressPercent');
+                const bytes = document.getElementById('progressBytes');
+                if (total) {
+                    const pct = Math.min(Math.max((loaded / total) * 100, 0), 100);
+                    fill.style.width = `${pct.toFixed(1)}%`;
+                    percent.textContent = `${pct.toFixed(1)}%`;
+                    bytes.textContent = `${formatBytes(loaded)} / ${formatBytes(total)}`;
+                } else {
+                    fill.style.width = '100%';
+                    percent.textContent = 'Uploading';
+                    bytes.textContent = formatBytes(loaded);
+                }
+            }
+
+            // Handle form submission with browser upload progress.
             document.getElementById('uploadForm').addEventListener('submit', async function(e) {
                 e.preventDefault();
 
@@ -550,10 +608,11 @@ def upload_form():
                 const submitButton = form.querySelector('button[type="submit"]');
                 const progress = document.getElementById('progress');
                 const result = document.getElementById('result');
+                const selectedFile = form.querySelector('#file').files[0];
 
                 // Manually collect form data to handle multiple checkboxes properly
                 formData.append('sample', form.querySelector('#sample').value);
-                formData.append('file', form.querySelector('#file').files[0]);
+                formData.append('file', selectedFile);
                 formData.append('auto_process', form.querySelector('#auto_process').checked ? '1' : '0');
 
                 // Collect all checked benchmarking options
@@ -568,30 +627,58 @@ def upload_form():
                 progress.style.display = 'block';
                 submitButton.disabled = true;
                 result.innerHTML = '';
+                setProgress(0, selectedFile ? selectedFile.size : 0);
 
                 try {
-                    const response = await fetch(form.action, {
-                        method: 'POST',
-                        headers: form.querySelector('#api_key').value
-                            ? {'X-VCBench-API-Key': form.querySelector('#api_key').value}
-                            : {},
-                        body: formData
+                    const data = await new Promise((resolve, reject) => {
+                        const xhr = new XMLHttpRequest();
+                        xhr.open('POST', form.action);
+
+                        const apiKey = form.querySelector('#api_key').value;
+                        if (apiKey) {
+                            xhr.setRequestHeader('X-VCBench-API-Key', apiKey);
+                        }
+
+                        xhr.upload.addEventListener('progress', event => {
+                            if (event.lengthComputable) {
+                                setProgress(event.loaded, event.total);
+                            } else {
+                                setProgress(event.loaded, selectedFile ? selectedFile.size : 0);
+                            }
+                        });
+
+                        xhr.addEventListener('load', () => {
+                            let parsed;
+                            try {
+                                parsed = JSON.parse(xhr.responseText || '{}');
+                            } catch (parseError) {
+                                reject(new Error('Invalid server response'));
+                                return;
+                            }
+
+                            if (xhr.status >= 200 && xhr.status < 300) {
+                                setProgress(selectedFile ? selectedFile.size : 1, selectedFile ? selectedFile.size : 1);
+                                resolve(parsed);
+                            } else {
+                                reject(new Error(parsed.detail || 'Upload failed'));
+                            }
+                        });
+
+                        xhr.addEventListener('error', () => reject(new Error('Network error during upload')));
+                        xhr.addEventListener('abort', () => reject(new Error('Upload aborted')));
+                        xhr.send(formData);
                     });
 
-                    const data = await response.json();
-
-                    if (response.ok) {
-                        result.innerHTML = `
-                            <div class="success">
-                                <h4>Upload complete</h4>
-                                <p><strong>Run Name:</strong> ${data.run_name}</p>
-                                <p><strong>Auto Process:</strong> ${data.auto_process ? 'Yes' : 'No'}</p>
-                                <p><strong>Benchmarking:</strong> ${data.benchmarking || 'None'}</p>
-                            </div>
-                        `;
-                    } else {
-                        throw new Error(data.detail || 'Upload failed');
-                    }
+                    result.innerHTML = `
+                        <div class="success">
+                            <h4>Upload complete</h4>
+                            <p><strong>Run Name:</strong> ${data.run_name}</p>
+                            <p><strong>Job ID:</strong> ${data.job_id || 'not available'}</p>
+                            <p><strong>Bytes Received:</strong> ${formatBytes(data.bytes_received || 0)}</p>
+                            <p><strong>Auto Process:</strong> ${data.auto_process ? 'Yes' : 'No'}</p>
+                            <p><strong>Benchmarking:</strong> ${data.benchmarking || 'None'}</p>
+                        </div>
+                    `;
                 } catch (error) {
                     result.innerHTML = `
                         <div class="error">
