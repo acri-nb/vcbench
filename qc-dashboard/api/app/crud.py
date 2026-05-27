@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timedelta
+from sqlalchemy import func
 
 from api.app import models
 from api.app import schemas
@@ -158,6 +159,158 @@ def delete_qc_metric(db: Session, metric_id: int) -> bool:
         db.commit()
         return True
     return False
+
+
+# Transfer Jobs
+
+def create_transfer_job(
+    db: Session,
+    *,
+    job_type: models.TransferJobType,
+    subject_id: str,
+    phase: models.TransferJobPhase | None = None,
+    status: models.TransferJobStatus = models.TransferJobStatus.RUNNING,
+    source_uri: str | None = None,
+    destination_path: str | None = None,
+    bytes_total: int | None = None,
+    metadata_json: dict | None = None,
+) -> models.TransferJob:
+    job = models.TransferJob(
+        type=job_type,
+        subject_id=subject_id,
+        status=status,
+        phase=phase,
+        source_uri=source_uri,
+        destination_path=destination_path,
+        bytes_total=bytes_total,
+        bytes_done=0,
+        metadata_json=metadata_json,
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    return job
+
+
+def get_transfer_job(db: Session, job_id: str) -> Optional[models.TransferJob]:
+    return db.query(models.TransferJob).filter(models.TransferJob.id == job_id).first()
+
+
+def list_transfer_jobs(
+    db: Session,
+    *,
+    status: models.TransferJobStatus | None = None,
+    job_type: models.TransferJobType | None = None,
+    limit: int = 100,
+) -> list[models.TransferJob]:
+    query = db.query(models.TransferJob)
+    if status is not None:
+        query = query.filter(models.TransferJob.status == status)
+    if job_type is not None:
+        query = query.filter(models.TransferJob.type == job_type)
+    return (
+        query.order_by(models.TransferJob.updated_at.desc(), models.TransferJob.started_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+
+def next_transfer_event_sequence(db: Session, job_id: str) -> int:
+    current = (
+        db.query(func.max(models.TransferEvent.sequence))
+        .filter(models.TransferEvent.job_id == job_id)
+        .scalar()
+    )
+    return (current or 0) + 1
+
+
+def create_transfer_event(
+    db: Session,
+    *,
+    job_id: str,
+    message: str,
+    level: models.TransferEventLevel = models.TransferEventLevel.INFO,
+    phase: models.TransferJobPhase | None = None,
+    bytes_done: int | None = None,
+    bytes_total: int | None = None,
+    rate_bps: int | None = None,
+    metadata_json: dict | None = None,
+) -> models.TransferEvent:
+    event = models.TransferEvent(
+        job_id=job_id,
+        sequence=next_transfer_event_sequence(db, job_id),
+        message=message,
+        level=level,
+        phase=phase,
+        bytes_done=bytes_done,
+        bytes_total=bytes_total,
+        rate_bps=rate_bps,
+        metadata_json=metadata_json,
+    )
+    job = get_transfer_job(db, job_id)
+    if job:
+        job.updated_at = datetime.utcnow()
+    db.add(event)
+    db.commit()
+    db.refresh(event)
+    return event
+
+
+def list_transfer_events(db: Session, job_id: str, since: int = 0) -> list[models.TransferEvent]:
+    query = db.query(models.TransferEvent).filter(models.TransferEvent.job_id == job_id)
+    if since:
+        query = query.filter(models.TransferEvent.sequence > since)
+    return query.order_by(models.TransferEvent.sequence.asc()).all()
+
+
+def count_transfer_events(db: Session, job_id: str) -> int:
+    return db.query(models.TransferEvent).filter(models.TransferEvent.job_id == job_id).count()
+
+
+def update_transfer_job(
+    db: Session,
+    job_id: str,
+    **values,
+) -> Optional[models.TransferJob]:
+    job = get_transfer_job(db, job_id)
+    if not job:
+        return None
+    for key, value in values.items():
+        setattr(job, key, value)
+    job.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(job)
+    return job
+
+
+def count_transfer_jobs(
+    db: Session,
+    *,
+    status: models.TransferJobStatus | None = None,
+    failed_since: datetime | None = None,
+) -> int:
+    query = db.query(models.TransferJob)
+    if status is not None:
+        query = query.filter(models.TransferJob.status == status)
+    if failed_since is not None:
+        query = query.filter(
+            models.TransferJob.status == models.TransferJobStatus.FAILED,
+            models.TransferJob.completed_at >= failed_since,
+        )
+    return query.count()
+
+
+def total_active_rate_bps(db: Session) -> int:
+    total = (
+        db.query(func.coalesce(func.sum(models.TransferJob.rate_bps), 0))
+        .filter(models.TransferJob.status == models.TransferJobStatus.RUNNING)
+        .scalar()
+    )
+    return int(total or 0)
+
+
+def failed_jobs_last_24h(db: Session) -> int:
+    return count_transfer_jobs(db, failed_since=datetime.utcnow() - timedelta(hours=24))
 
 # Happy Metrics
 

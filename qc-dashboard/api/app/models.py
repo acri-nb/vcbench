@@ -1,8 +1,10 @@
-from sqlalchemy import (Column, Integer, String, Float, DateTime, Text, UniqueConstraint,
-                        ForeignKey, Enum as SQLAlchemyEnum)
+from sqlalchemy import (BigInteger, Boolean, Column, Integer, String, Float, DateTime,
+                        Text, UniqueConstraint, ForeignKey, Enum as SQLAlchemyEnum,
+                        JSON)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
+import uuid
 
 from api.app.database import Base
 
@@ -24,6 +26,42 @@ class FileTypeEnum(str, enum.Enum):
     bed_coverage         = "bed_coverage"
     WGS_contig_mean_cov  = "WGS_contig_mean_cov"
     mapping_metrics      = "mapping_metrics"
+
+
+def enum_values(enum_class):
+    return [item.value for item in enum_class]
+
+
+class TransferJobType(str, enum.Enum):
+    UPLOAD_ZIP = "upload_zip"
+    AWS_IMPORT = "aws_import"
+    PIPELINE = "pipeline"
+
+
+class TransferJobStatus(str, enum.Enum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELED = "canceled"
+
+
+class TransferJobPhase(str, enum.Enum):
+    UPLOAD = "upload"
+    DOWNLOAD = "download"
+    VALIDATE = "validate"
+    EXTRACT = "extract"
+    REFERENCE_SETUP = "reference_setup"
+    PROCESS = "process"
+    COMPLETE = "complete"
+
+
+class TransferEventLevel(str, enum.Enum):
+    INFO = "info"
+    PROGRESS = "progress"
+    SUCCESS = "success"
+    WARNING = "warning"
+    ERROR = "error"
 
 class User(Base):
     __tablename__ = "users"
@@ -52,6 +90,93 @@ class LabRun(Base):
     qc_metrics = relationship("QCMetric", back_populates="run", cascade="all, delete-orphan")
     happy_metrics = relationship("HappyMetric", back_populates="run", cascade="all, delete-orphan")
     truvari_metrics = relationship("TruvariMetric", back_populates="run", cascade="all, delete-orphan")
+
+
+class TransferJob(Base):
+    __tablename__ = "transfer_jobs"
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
+    type = Column(
+        SQLAlchemyEnum(
+            TransferJobType,
+            values_callable=enum_values,
+            name="transferjobtype",
+        ),
+        nullable=False,
+        index=True,
+    )
+    subject_id = Column(String, nullable=False, index=True)
+    status = Column(
+        SQLAlchemyEnum(
+            TransferJobStatus,
+            values_callable=enum_values,
+            name="transferjobstatus",
+        ),
+        nullable=False,
+        default=TransferJobStatus.QUEUED,
+        index=True,
+    )
+    phase = Column(
+        SQLAlchemyEnum(
+            TransferJobPhase,
+            values_callable=enum_values,
+            name="transferjobphase",
+        ),
+        nullable=True,
+        index=True,
+    )
+    source_uri = Column(String, nullable=True)
+    destination_path = Column(String, nullable=True)
+    bytes_total = Column(BigInteger, nullable=True)
+    bytes_done = Column(BigInteger, nullable=False, default=0)
+    rate_bps = Column(BigInteger, nullable=True)
+    eta_seconds = Column(Integer, nullable=True)
+    started_at = Column(DateTime, server_default=func.now(), nullable=True)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    error_code = Column(String, nullable=True)
+    error_message = Column(Text, nullable=True)
+    cancel_requested = Column(Boolean, nullable=False, default=False)
+    metadata_json = Column(JSON, nullable=True)
+
+    events = relationship(
+        "TransferEvent",
+        back_populates="job",
+        cascade="all, delete-orphan",
+        order_by="TransferEvent.sequence",
+    )
+
+
+class TransferEvent(Base):
+    __tablename__ = "transfer_events"
+    __table_args__ = (UniqueConstraint("job_id", "sequence", name="unique_transfer_event_sequence"),)
+    id = Column(Integer, primary_key=True, index=True)
+    job_id = Column(String, ForeignKey("transfer_jobs.id", ondelete="CASCADE"), nullable=False, index=True)
+    sequence = Column(Integer, nullable=False)
+    timestamp = Column(DateTime, server_default=func.now(), nullable=True)
+    level = Column(
+        SQLAlchemyEnum(
+            TransferEventLevel,
+            values_callable=enum_values,
+            name="transfereventlevel",
+        ),
+        nullable=False,
+        default=TransferEventLevel.INFO,
+    )
+    phase = Column(
+        SQLAlchemyEnum(
+            TransferJobPhase,
+            values_callable=enum_values,
+            name="transferjobphase",
+        ),
+        nullable=True,
+    )
+    message = Column(Text, nullable=False)
+    bytes_done = Column(BigInteger, nullable=True)
+    bytes_total = Column(BigInteger, nullable=True)
+    rate_bps = Column(BigInteger, nullable=True)
+    metadata_json = Column(JSON, nullable=True)
+
+    job = relationship("TransferJob", back_populates="events")
 
 class QCMetric(Base):
     __tablename__ = "qc_metrics"

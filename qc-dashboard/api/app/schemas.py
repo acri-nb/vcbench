@@ -2,7 +2,14 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
 
-from api.app.models import RunStatus, FileTypeEnum
+from api.app.models import (
+    FileTypeEnum,
+    RunStatus,
+    TransferEventLevel,
+    TransferJobPhase,
+    TransferJobStatus,
+    TransferJobType,
+)
 
 # User
 
@@ -126,3 +133,57 @@ class TruvariMetricResponse(TruvariMetricBase):
 
     class Config:
         from_attributes = True
+
+
+# Transfer Jobs
+
+class TransferJobBase(BaseModel):
+    type: TransferJobType
+    subject_id: str
+    status: TransferJobStatus
+    phase: Optional[TransferJobPhase] = None
+    source_uri: Optional[str] = None
+    destination_path: Optional[str] = None
+    bytes_total: Optional[int] = None
+    bytes_done: int = 0
+    rate_bps: Optional[int] = None
+    eta_seconds: Optional[int] = None
+    error_code: Optional[str] = None
+    error_message: Optional[str] = None
+    cancel_requested: bool = False
+    metadata_json: Optional[dict] = None
+
+
+class TransferJobResponse(TransferJobBase):
+    id: str
+    started_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class TransferEventResponse(BaseModel):
+    id: int
+    job_id: str
+    sequence: int
+    timestamp: Optional[datetime] = None
+    level: TransferEventLevel
+    phase: Optional[TransferJobPhase] = None
+    message: str
+    bytes_done: Optional[int] = None
+    bytes_total: Optional[int] = None
+    rate_bps: Optional[int] = None
+    metadata_json: Optional[dict] = None
+
+    class Config:
+        from_attributes = True
+
+
+class TransferJobSummary(BaseModel):
+    active_jobs: int
+    queued_jobs: int
+    failed_24h: int
+    total_rate_bps: int
+    disk_free_bytes: int
