@@ -136,7 +136,7 @@ class TransferJob(Base):
     error_code = Column(String, nullable=True)
     error_message = Column(Text, nullable=True)
     cancel_requested = Column(Boolean, nullable=False, default=False)
-    metadata_json = Column(JSON, nullable=True)
+    metadata_json = Column("metadata", JSON, nullable=True)
 
     events = relationship(
         "TransferEvent",
@@ -174,7 +174,7 @@ class TransferEvent(Base):
     bytes_done = Column(BigInteger, nullable=True)
     bytes_total = Column(BigInteger, nullable=True)
     rate_bps = Column(BigInteger, nullable=True)
-    metadata_json = Column(JSON, nullable=True)
+    metadata_json = Column("metadata", JSON, nullable=True)
 
     job = relationship("TransferJob", back_populates="events")
 
