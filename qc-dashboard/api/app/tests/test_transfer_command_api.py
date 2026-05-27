@@ -26,14 +26,17 @@ class TransferCommandApiTest(unittest.TestCase):
         self.db = self.Session()
 
         from api.app.api_v1.endpoints import runs, uploads
+        from api.tasks import upload_run as upload_task
 
         self.original_upload_dir = uploads.UPLOAD_DIR
         self.original_lab_runs_dir = uploads.LAB_RUNS_DIR
         self.original_settings_upload_dir = settings.UPLOAD_DIR
+        self.original_temp_run_dir = upload_task.TEMP_RUN_DIR
         self.original_run_pipeline = runs.run_pipeline
         uploads.UPLOAD_DIR = self.tmp_path / "uploads"
         uploads.LAB_RUNS_DIR = self.tmp_path / "lab_runs"
         settings.UPLOAD_DIR = uploads.UPLOAD_DIR
+        upload_task.TEMP_RUN_DIR = uploads.UPLOAD_DIR
         runs.run_pipeline = lambda *args, **kwargs: None
 
         app = FastAPI()
@@ -52,10 +55,12 @@ class TransferCommandApiTest(unittest.TestCase):
 
     def tearDown(self):
         from api.app.api_v1.endpoints import runs, uploads
+        from api.tasks import upload_run as upload_task
 
         uploads.UPLOAD_DIR = self.original_upload_dir
         uploads.LAB_RUNS_DIR = self.original_lab_runs_dir
         settings.UPLOAD_DIR = self.original_settings_upload_dir
+        upload_task.TEMP_RUN_DIR = self.original_temp_run_dir
         runs.run_pipeline = self.original_run_pipeline
         self.db.close()
         Base.metadata.drop_all(bind=self.engine)
