@@ -18,9 +18,13 @@ Built at the [Atlantic Cancer Research Institute (IARC)](https://canceratlantiqu
 |---------------------------------------------------|-----------------------------------------------------|
 | ![Overview page](docs/images/overview.png)        | ![QC dashboard](docs/images/dashboard.png)          |
 
-| Pipeline (`/runs`)                                | Truvari (`/truvari`)                                |
+| Pipeline (`/runs`)                                | Transfer monitoring (`/monitoring`)                 |
 |---------------------------------------------------|-----------------------------------------------------|
-| ![Pipeline page](docs/images/pipeline.png)        | ![Truvari results](docs/images/truvari.png)         |
+| ![Pipeline page](docs/images/pipeline.png)        | ![Transfer monitoring](docs/images/monitoring.png)  |
+
+| Truvari (`/truvari`)                              | Upload form (`/api/v1/upload/form`)                 |
+|---------------------------------------------------|-----------------------------------------------------|
+| ![Truvari results](docs/images/truvari.png)       | ![Upload form](docs/images/upload-form.png)         |
 
 ---
 
@@ -88,6 +92,7 @@ The Dash UI is mounted inside FastAPI via `WSGIMiddleware`, so a single uvicorn 
 | `/`                   | Overview — recent runs and workspace navigation                      |
 | `/home`               | QC dashboard — multi-sample metric comparison                        |
 | `/runs`               | Pipeline — AWS S3 import, ZIP upload, benchmarking control           |
+| `/monitoring`         | Transfer monitoring — ZIP uploads, AWS imports and pipeline jobs     |
 | `/truvari`            | Structural-variant benchmarking results                              |
 | `/api/v1/*`           | REST API (runs, hap.py / Truvari metrics, uploads, dash, downloads)  |
 | `/api/v1/upload/form` | Embeddable upload form (used as an `<iframe>` inside `/runs`)        |
