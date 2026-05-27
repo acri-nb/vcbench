@@ -14,6 +14,7 @@ from api.app.api_v1.endpoints import (
     dash,
     download_status,
     happy_metrics,
+    jobs,
     qc_metrics,
     runs,
     truvari_metrics,
@@ -62,6 +63,7 @@ app.include_router(truvari_metrics.router, prefix="/api/v1", tags=["truvari-metr
 app.include_router(users.router, prefix="/api/v1", tags=["users"])
 app.include_router(runs.router, prefix="/api/v1", tags=["runs"])
 app.include_router(uploads.router, prefix="/api/v1", tags=["uploads"])
+app.include_router(jobs.router, prefix="/api/v1", tags=["jobs"])
 app.include_router(qc_metrics.router, prefix="/api/v1", tags=["qc-metrics"])
 app.include_router(dash.router, prefix="/api/v1/dash", tags=["dash"])
 app.include_router(download_status.router, prefix="/api/v1", tags=["download-status"])
@@ -70,6 +72,11 @@ app.include_router(download_status.router, prefix="/api/v1", tags=["download-sta
 @app.websocket("/ws/download/{sample_id}")
 async def websocket_download_logs(websocket: WebSocket, sample_id: str):
     await ws_manager.websocket_endpoint(websocket, sample_id)
+
+
+@app.websocket("/ws/jobs/{job_id}")
+async def websocket_job_logs(websocket: WebSocket, job_id: str):
+    await ws_manager.websocket_endpoint(websocket, job_id)
 
 # Mount the Dash app at the root path
 app.mount("/", WSGIMiddleware(dash_app.server))
