@@ -8,7 +8,7 @@ from typing import Optional
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from api.app import crud, models, schemas, settings
+from api.app import crud, job_service, models, schemas, settings
 from api.app import websocket as ws_manager
 from api.app.database import SessionLocal, get_db
 from api.app.security import Role, require_role
@@ -31,10 +31,18 @@ class AWSUploadRequest(BaseModel):
 
 # FILES -------------------------------------------------------------------------------------------
 
-def process_run_background(zip_path: Path, sample: str, lab_run_id: int, benchmarking_options: str = ""):
+def process_run_background(
+    zip_path: Path,
+    sample: str,
+    lab_run_id: int,
+    benchmarking_options: str = "",
+    job_id: str | None = None,
+):
     """Background task to process the uploaded run"""
     db = SessionLocal()
     try:
+        if job_id:
+            job_service.mark_phase(db, job_id, models.TransferJobPhase.EXTRACT, "Extracting uploaded archive")
         crud.update_lab_run_status(db, lab_run_id, models.RunStatus.PROCESSING)
         # Extract the run using existing upload_run function
         parsed_sample, run = upload_run(zip_path)
@@ -48,6 +56,8 @@ def process_run_background(zip_path: Path, sample: str, lab_run_id: int, benchma
         csv_reformat = "csv" in benchmarking_options
 
         # Run the pipeline
+        if job_id:
+            job_service.mark_phase(db, job_id, models.TransferJobPhase.PROCESS, "Starting benchmarking pipeline")
         run_pipeline(
             parsed_sample,
             run,
@@ -57,10 +67,17 @@ def process_run_background(zip_path: Path, sample: str, lab_run_id: int, benchma
             csv_reformat=csv_reformat
         )
         crud.update_lab_run_status(db, lab_run_id, models.RunStatus.AWAITING_APPROVAL)
+        if job_id:
+            job_service.complete_job(db, job_id, "Upload processing completed")
 
     except Exception as e:
         db.rollback()
         crud.update_lab_run_status(db, lab_run_id, models.RunStatus.FAILED, error_message=str(e))
+        if job_id:
+            try:
+                job_service.fail_job(db, job_id, str(e), error_code="upload_processing_failed")
+            except Exception:
+                db.rollback()
     finally:
         db.close()
 
@@ -76,7 +93,7 @@ def _get_or_create_lab_run(db: Session, run_name: str, status: models.RunStatus)
     )
 
 
-async def process_aws_run_background(sample_id: str, benchmarking_options: str = ""):
+async def process_aws_run_background(sample_id: str, benchmarking_options: str = "", job_id: str | None = None):
     """Download an AWS run, then process it while publishing polling/WebSocket logs."""
     run_name = f"{sample_id}_R001"
     lab_run_id: int | None = None
@@ -87,10 +104,30 @@ async def process_aws_run_background(sample_id: str, benchmarking_options: str =
     await ws_manager.broadcast_log(sample_id, f"Starting AWS download for sample: {sample_id}", ws_manager.LogLevel.INFO)
 
     try:
+        if job_id is None:
+            job = job_service.create_job(
+                db,
+                job_type=models.TransferJobType.AWS_IMPORT,
+                subject_id=sample_id,
+                phase=models.TransferJobPhase.DOWNLOAD,
+                source_uri=f"s3://{sample_id}",
+                destination_path=str(LAB_RUNS_DIR / run_name),
+            )
+            job_id = job.id
+        else:
+            job_service.mark_phase(db, job_id, models.TransferJobPhase.DOWNLOAD, "Starting AWS download")
+
         lab_run = _get_or_create_lab_run(db, run_name, models.RunStatus.PROCESSING)
         lab_run_id = lab_run.id
 
         await ws_manager.broadcast_log(sample_id, f"Executing download script: {AWS_DOWNLOAD_SCRIPT}", ws_manager.LogLevel.INFO)
+        job_service.append_event(
+            db,
+            job_id,
+            f"Executing download script: {AWS_DOWNLOAD_SCRIPT}",
+            level=models.TransferEventLevel.INFO,
+            phase=models.TransferJobPhase.DOWNLOAD,
+        )
         process = await asyncio.create_subprocess_exec(
             str(AWS_DOWNLOAD_SCRIPT),
             sample_id,
@@ -117,12 +154,32 @@ async def process_aws_run_background(sample_id: str, benchmarking_options: str =
                 elif any(marker in decoded_line for marker in ["[PROGRESS]", "Téléchargement"]):
                     level = ws_manager.LogLevel.PROGRESS
                 await ws_manager.broadcast_log(sample_id, decoded_line, level)
+                event_level = {
+                    ws_manager.LogLevel.SUCCESS: models.TransferEventLevel.SUCCESS,
+                    ws_manager.LogLevel.WARNING: models.TransferEventLevel.WARNING,
+                    ws_manager.LogLevel.ERROR: models.TransferEventLevel.ERROR,
+                    ws_manager.LogLevel.PROGRESS: models.TransferEventLevel.PROGRESS,
+                }.get(level, models.TransferEventLevel.INFO)
+                job_service.append_event(
+                    db,
+                    job_id,
+                    decoded_line,
+                    level=event_level,
+                    phase=models.TransferJobPhase.DOWNLOAD,
+                )
 
         await process.wait()
         if process.returncode != 0:
             raise subprocess.CalledProcessError(process.returncode, str(AWS_DOWNLOAD_SCRIPT))
 
         await ws_manager.broadcast_log(sample_id, "AWS download completed successfully", ws_manager.LogLevel.SUCCESS)
+        job_service.append_event(
+            db,
+            job_id,
+            "AWS download completed successfully",
+            level=models.TransferEventLevel.SUCCESS,
+            phase=models.TransferJobPhase.DOWNLOAD,
+        )
         run_dir = LAB_RUNS_DIR / run_name
         if not run_dir.exists():
             raise FileNotFoundError(f"Expected run directory not found: {run_dir}")
@@ -132,6 +189,7 @@ async def process_aws_run_background(sample_id: str, benchmarking_options: str =
             crud.update_lab_run_name(db, lab_run_id, run_dir.name)
 
         await ws_manager.broadcast_log(sample_id, "Verifying reference files", ws_manager.LogLevel.INFO)
+        job_service.mark_phase(db, job_id, models.TransferJobPhase.REFERENCE_SETUP, "Verifying reference files")
         ready, message = ensure_references(parsed_sample, auto_download=True)
         if not ready:
             raise FileNotFoundError(message)
@@ -142,6 +200,7 @@ async def process_aws_run_background(sample_id: str, benchmarking_options: str =
         csv_reformat = "csv" in benchmarking_options
 
         await ws_manager.broadcast_log(sample_id, "Starting benchmarking pipeline", ws_manager.LogLevel.INFO)
+        job_service.mark_phase(db, job_id, models.TransferJobPhase.PROCESS, "Starting benchmarking pipeline")
         run_pipeline(
             parsed_sample,
             run,
@@ -153,6 +212,7 @@ async def process_aws_run_background(sample_id: str, benchmarking_options: str =
         if lab_run_id is not None:
             crud.update_lab_run_status(db, lab_run_id, models.RunStatus.AWAITING_APPROVAL)
         await ws_manager.broadcast_log(sample_id, "Benchmarking pipeline completed successfully", ws_manager.LogLevel.SUCCESS)
+        job_service.complete_job(db, job_id, "Benchmarking pipeline completed successfully")
         ws_manager.set_status(sample_id, ws_manager.DownloadStatus.COMPLETED)
 
     except Exception as e:
@@ -163,6 +223,11 @@ async def process_aws_run_background(sample_id: str, benchmarking_options: str =
             except Exception:
                 db.rollback()
         await ws_manager.broadcast_log(sample_id, f"Error processing AWS run: {e}", ws_manager.LogLevel.ERROR)
+        if job_id:
+            try:
+                job_service.fail_job(db, job_id, str(e), error_code="aws_import_failed")
+            except Exception:
+                db.rollback()
         ws_manager.set_status(sample_id, ws_manager.DownloadStatus.ERROR)
         raise
     finally:
@@ -191,6 +256,22 @@ async def upload_run_endpoint(
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     dest = unique_upload_path(filename)
     run_name = Path(filename).stem
+    job = job_service.create_job(
+        db,
+        job_type=models.TransferJobType.UPLOAD_ZIP,
+        subject_id=run_name,
+        phase=models.TransferJobPhase.UPLOAD,
+        source_uri=filename,
+        destination_path=str(dest),
+        bytes_total=getattr(file, "size", None),
+    )
+    job_service.append_event(
+        db,
+        job.id,
+        f"Receiving upload archive: {filename}",
+        level=models.TransferEventLevel.INFO,
+        phase=models.TransferJobPhase.UPLOAD,
+    )
 
     # Stream to disk in chunks (no full read into memory)
     try:
@@ -204,6 +285,12 @@ async def upload_run_endpoint(
                 if bytes_written > settings.MAX_UPLOAD_BYTES:
                     raise HTTPException(status_code=413, detail="Upload exceeds configured size limit")
                 out.write(chunk)
+                job_service.update_progress(
+                    db,
+                    job.id,
+                    bytes_done=bytes_written,
+                    bytes_total=getattr(file, "size", None) or bytes_written,
+                )
 
         lab_run = crud.get_lab_run_by_name(db, run_name)
         if lab_run is None:
@@ -218,11 +305,15 @@ async def upload_run_endpoint(
             crud.update_lab_run_status(db, lab_run.id, models.RunStatus.PENDING_PROCESSING)
 
         if auto_process and background_tasks:
-            background_tasks.add_task(process_run_background, dest, sample, lab_run.id, benchmarking)
+            background_tasks.add_task(process_run_background, dest, sample, lab_run.id, benchmarking, job.id)
+        else:
+            job_service.complete_job(db, job.id, "Upload stored successfully")
 
         return {
             "ok": True,
             "run_name": run_name,
+            "job_id": job.id,
+            "bytes_received": bytes_written,
             "status": models.RunStatus.PENDING_PROCESSING,
             "auto_process": auto_process,
             "benchmarking": benchmarking
@@ -231,11 +322,13 @@ async def upload_run_endpoint(
     except HTTPException:
         if dest.exists():
             dest.unlink()
+        job_service.fail_job(db, job.id, "Upload failed", error_code="upload_failed")
         raise
     except Exception as e:
         # Clean up on error
         if dest.exists():
             dest.unlink()
+        job_service.fail_job(db, job.id, str(e), error_code="upload_failed")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 @router.get("/upload/form")
@@ -522,6 +615,7 @@ def upload_form():
 async def upload_aws_run_endpoint(
     background_tasks: BackgroundTasks,
     request: AWSUploadRequest,
+    db: Session = Depends(get_db),
     _role: Role = Depends(require_role(Role.OPERATOR)),
 ):
     """Import a run from AWS S3 using the configured download script."""
@@ -532,13 +626,25 @@ async def upload_aws_run_endpoint(
     if not sample_id:
         raise HTTPException(status_code=400, detail="sample_id cannot be empty")
 
+    job = job_service.create_job(
+        db,
+        job_type=models.TransferJobType.AWS_IMPORT,
+        subject_id=sample_id,
+        phase=models.TransferJobPhase.DOWNLOAD,
+        status=models.TransferJobStatus.QUEUED,
+        source_uri=f"s3://{sample_id}",
+        destination_path=str(LAB_RUNS_DIR / f"{sample_id}_R001"),
+        metadata_json={"benchmarking": request.benchmarking or ""},
+    )
+
     if request.auto_process:
-        background_tasks.add_task(process_aws_run_background, sample_id, request.benchmarking or "")
+        background_tasks.add_task(process_aws_run_background, sample_id, request.benchmarking or "", job.id)
 
     return {
         "ok": True,
         "sample_id": sample_id,
         "run_name": f"{sample_id}_R001",
+        "job_id": job.id,
         "auto_process": request.auto_process,
         "benchmarking": request.benchmarking,
         "message": "AWS download initiated" if request.auto_process else "AWS download will be triggered manually",
