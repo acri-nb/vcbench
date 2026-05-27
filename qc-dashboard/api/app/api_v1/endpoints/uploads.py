@@ -723,6 +723,13 @@ async def upload_aws_run_endpoint(
         destination_path=str(LAB_RUNS_DIR / f"{sample_id}_R001"),
         metadata_json={"benchmarking": request.benchmarking or ""},
     )
+    job_service.append_event(
+        db,
+        job.id,
+        "AWS import queued",
+        level=models.TransferEventLevel.INFO,
+        phase=models.TransferJobPhase.DOWNLOAD,
+    )
 
     if request.auto_process:
         background_tasks.add_task(process_aws_run_background, sample_id, request.benchmarking or "", job.id)
