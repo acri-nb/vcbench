@@ -25,6 +25,7 @@ def _site_header():
                 [
                     dcc.Link("Overview", href="/"),
                     dcc.Link("Pipeline", href="/runs", className="active"),
+                    dcc.Link("Monitoring", href="/monitoring"),
                     dcc.Link("Dashboard", href="/home"),
                     dcc.Link("Truvari", href="/truvari"),
                     html.A("API", href="/docs", target="_blank"),
@@ -616,9 +617,11 @@ def launch_aws_import(n_clicks, sample_id, selected_benchmarking, auto_process):
                     html.H4("AWS Import Initiated!", style={"color": "#155724", "margin-bottom": "10px"}),
                     html.P(f"Sample ID: {data['sample_id']}"),
                     html.P(f"Run Name: {data['run_name']}"),
+                    html.P(f"Job ID: {data.get('job_id', 'not available')}"),
                     html.P(f"Benchmarking: {benchmarking_list}"),
                     html.P(f"Auto Process: {'Yes' if auto_process_bool else 'No'}"),
-                    html.P(data.get('message', ''), style={"font-style": "italic", "margin-top": "10px"})
+                    html.P(data.get('message', ''), style={"font-style": "italic", "margin-top": "10px"}),
+                    dcc.Link("Open Monitoring", href="/monitoring", className="btn btn-secondary")
                 ], style={
                     "padding": "15px",
                     "background-color": "#d4edda",

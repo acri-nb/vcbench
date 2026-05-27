@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from pathlib import Path
 from typing import Optional
 
-from api.app import crud, schemas, models
+from api.app import crud, job_service, schemas, models
 from api.app.database import get_db
 from api.app.security import Role, require_role
 from api.app import settings
@@ -176,8 +176,25 @@ async def process_run_benchmarking(
     _role: Role = Depends(require_role(Role.OPERATOR)),
 ):
     lab_run = None
+    job = None
     try:
         sample, run = split_run_name(run_name)
+        job = job_service.create_job(
+            db,
+            job_type=models.TransferJobType.PIPELINE,
+            subject_id=run_name,
+            phase=models.TransferJobPhase.PROCESS,
+            source_uri=str(LAB_RUNS_DIR / run_name),
+            destination_path=str(PROCESSED_DIR),
+            metadata_json={"benchmarking": benchmarking},
+        )
+        job_service.append_event(
+            db,
+            job.id,
+            f"Starting benchmarking for {run_name}",
+            level=models.TransferEventLevel.INFO,
+            phase=models.TransferJobPhase.PROCESS,
+        )
         try:
             lab_run = crud.get_lab_run_by_name(db, run_name)
         except Exception:
@@ -200,11 +217,17 @@ async def process_run_benchmarking(
             truvari="truvari" in benchmarking
         )
         crud.update_lab_run_status(db, lab_run.id, models.RunStatus.AWAITING_APPROVAL)
-        return {"ok": True, "run_name": run_name, "benchmarking": benchmarking}
+        job_service.complete_job(db, job.id, "Benchmarking completed successfully")
+        return {"ok": True, "run_name": run_name, "benchmarking": benchmarking, "job_id": job.id}
     except Exception as e:
         if lab_run:
             try:
                 crud.update_lab_run_status(db, lab_run.id, models.RunStatus.FAILED, error_message=str(e))
+            except Exception:
+                db.rollback()
+        if job:
+            try:
+                job_service.fail_job(db, job.id, str(e), error_code="pipeline_failed")
             except Exception:
                 db.rollback()
         raise HTTPException(status_code=500, detail=f"Error processing run: {str(e)}")

@@ -20,6 +20,13 @@ NAV_ACTIONS = [
         "external": False,
     },
     {
+        "label": "Operations",
+        "title": "Transfer Monitoring",
+        "desc": "Watch uploads, AWS imports, and pipeline jobs with live diagnostics.",
+        "href": "/monitoring",
+        "external": False,
+    },
+    {
         "label": "Reference",
         "title": "API Documentation",
         "desc": "Inspect REST endpoints, schemas, and OpenAPI definitions.",
@@ -50,6 +57,7 @@ def _site_header():
                 [
                     dcc.Link("Overview", href="/", className="active"),
                     dcc.Link("Pipeline", href="/runs"),
+                    dcc.Link("Monitoring", href="/monitoring"),
                     dcc.Link("Dashboard", href="/home"),
                     dcc.Link("Truvari", href="/truvari"),
                     html.A("API", href="/docs", target="_blank"),

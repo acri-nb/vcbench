@@ -3,7 +3,7 @@
 import dash
 from dash import html, dcc, callback, Input, Output
 
-from dash_app.pages import home, runs, index, truvari
+from dash_app.pages import home, monitoring, runs, index, truvari
 from .callbacks import (
     register_callbacks,
     register_nav_callbacks,
@@ -35,6 +35,8 @@ def display_page(pathname):
     """Route to different pages based on URL"""
     if pathname == "/runs" or pathname == "/runs/":
         return runs.create_launch_layout()
+    elif pathname == "/monitoring" or pathname == "/monitoring/":
+        return monitoring.create_monitoring_layout()
     elif pathname == "/home" or pathname == "/home/":
         return home.build_layout()
     elif pathname == "/truvari" or pathname == "/truvari/":
