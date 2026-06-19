@@ -7,6 +7,7 @@ This module handles:
 - Validation of reference file structure
 """
 
+import re
 import subprocess
 from pathlib import Path
 from typing import Any, Tuple, Optional, Dict, List
@@ -64,11 +65,13 @@ def extract_base_sample(sample_name: str) -> str:
     if base_name in GIAB_SAMPLES:
         return base_name
     
-    # Also check if the full sample_name starts with a known GIAB sample
+    # Also check if the full sample_name starts with a known GIAB sample,
+    # anchored on a delimiter so "NA241430" / "NA24143XYZ" do NOT silently
+    # map to NA24143 (which would benchmark against the wrong GIAB truth set).
     for known_sample in GIAB_SAMPLES.keys():
-        if sample_name.startswith(known_sample):
+        if re.match(rf"{re.escape(known_sample)}(?:[^A-Za-z0-9]|$)", sample_name):
             return known_sample
-    
+
     # Return the base name
     return base_name
 

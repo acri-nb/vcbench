@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 from pathlib import Path
 import argparse
@@ -6,7 +7,7 @@ import logging
 
 from api.app import crud, schemas, settings
 from api.app.database import SessionLocal
-from api.tasks.parsers import reformat_csv, parse_summary, parse_truvari_summary
+from api.tasks.parsers import reformat_csv, parse_summary, parse_summary_rows, parse_truvari_summary
 from api.tasks import utils
 from api.tasks.setup_reference import ensure_references
 
@@ -69,7 +70,7 @@ def process_happy(sample, run, stratified=False):
     Process hap.py for a given reference and run.
     """
     # Extract base sample name (e.g., NA24143_Lib3_Rep1 -> NA24143)
-    from api.tasks.setup_reference import extract_base_sample
+    from api.tasks.setup_reference import extract_base_sample, GIAB_SAMPLES
     base_sample = extract_base_sample(sample)
     logger.info(f"Processing hap.py for sample={sample}, base_sample={base_sample}, run={run}")
     
@@ -135,66 +136,14 @@ def process_happy(sample, run, stratified=False):
             "\n".join(f"- {f}" for f in missing_files)
         )
     
+    # hap.py runs with --engine xcmp (see pipeline/happy.sh), which uses the
+    # FASTA reference only and does NOT need an RTG SDF. Resolve an existing SDF
+    # if one is present (kept for a possible future vcfeval engine) but never
+    # create one: the previous auto-creation pulled the abandoned
+    # pkrusche/hap.py:latest image (commit 24aed1c) to build an SDF that
+    # happy.sh ignores, failing the whole run on a cold cache for nothing.
     ref_sdf_list = list(REFERENCE_DIR.glob('*.sdf'))
-    if not ref_sdf_list:
-        # Try to create SDF if RTG Tools is available (locally or via Docker)
-        logger.warning(f"SDF file not found. Attempting to create it from FASTA...")
-        sdf_path = REFERENCE_DIR / 'GRCh38.sdf'
-        sdf_created = False
-        
-        # Try local RTG Tools first
-        try:
-            rtg_check = subprocess.run(['rtg', 'version'], capture_output=True, text=True, timeout=5)
-            if rtg_check.returncode == 0:
-                logger.info("RTG Tools found locally. Creating SDF format...")
-                rtg_cmd = ['rtg', 'format', '-o', str(sdf_path), str(ref_fasta)]
-                result = subprocess.run(rtg_cmd, capture_output=True, text=True, cwd=REFERENCE_DIR, timeout=3600)
-                if result.returncode == 0:
-                    logger.info("SDF format created successfully using local RTG Tools")
-                    ref_sdf = sdf_path
-                    sdf_created = True
-                else:
-                    logger.warning(f"Local RTG Tools failed: {result.stderr}")
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            logger.info("RTG Tools not found locally, trying Docker...")
-        
-        # If local RTG Tools failed or not available, try Docker
-        if not sdf_created:
-            try:
-                logger.info("Attempting to create SDF using Docker hap.py container...")
-                docker_fasta = f'/wgs/data/reference/{ref_fasta.name}'
-                docker_sdf = '/wgs/data/reference/GRCh38.sdf'
-                # RTG Tools is located at /opt/hap.py/libexec/rtg-tools-install/rtg in the container
-                docker_cmd = [
-                    'docker', 'run', '--rm',
-                    '-v', f'{PROJECT_ROOT}:/wgs',
-                    'pkrusche/hap.py:latest',
-                    '/opt/hap.py/libexec/rtg-tools-install/rtg', 'format', '-o', docker_sdf, docker_fasta
-                ]
-                result = subprocess.run(docker_cmd, capture_output=True, text=True, cwd=PROJECT_ROOT, timeout=3600)
-                if result.returncode == 0 and sdf_path.exists():
-                    logger.info("SDF format created successfully using Docker")
-                    ref_sdf = sdf_path
-                    sdf_created = True
-                else:
-                    logger.warning(f"Docker RTG Tools failed: {result.stderr}")
-            except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-                logger.warning(f"Docker not available or timed out: {e}")
-        
-        # If SDF creation failed, raise informative error
-        if not sdf_created:
-            raise FileNotFoundError(
-                f"SDF format is required for hap.py but could not be created automatically.\n\n"
-                f"Please create it manually using one of these methods:\n\n"
-                f"1. Using local RTG Tools:\n"
-                f"   rtg format -o {REFERENCE_DIR}/GRCh38.sdf {ref_fasta}\n\n"
-                f"2. Using Docker:\n"
-                f"   docker run --rm -v {PROJECT_ROOT}:/wgs pkrusche/hap.py:latest /opt/hap.py/libexec/rtg-tools-install/rtg format -o /wgs/data/reference/GRCh38.sdf /wgs/data/reference/{ref_fasta.name}\n\n"
-                f"3. Using setup script:\n"
-                f"   {PROJECT_ROOT}/script/setup_reference.sh {sample}\n"
-            )
-    else:
-        ref_sdf = ref_sdf_list[0]
+    ref_sdf_name = ref_sdf_list[0].name if ref_sdf_list else "unused.sdf"
     
     # Checksum for the gvcf file (optional - skipped if MD5 file not found)
     try:
@@ -220,6 +169,23 @@ def process_happy(sample, run, stratified=False):
         run_sample_name = utils.get_sample_name(run_gvcf)
     except Exception as e:
         raise ValueError(f"Error getting sample names: {e}")
+    # Make the truth-set selection auditable and catch the classic
+    # "benchmarked against the wrong GIAB truth set" footgun: the truth set is
+    # chosen from the run NAME (base_sample), so log the correspondence with the
+    # actual VCF sample names and warn loudly if the run VCF's own sample name
+    # maps to a *different* known GIAB sample than the one selected.
+    logger.info(
+        f"hap.py: run VCF sample '{run_sample_name}' (truth VCF sample "
+        f"'{ref_sample_name}') -> benchmarking against the GIAB truth set for "
+        f"base sample '{base_sample}'"
+    )
+    embedded = extract_base_sample(run_sample_name) if run_sample_name else base_sample
+    if embedded in GIAB_SAMPLES and embedded != base_sample:
+        logger.warning(
+            f"POSSIBLE TRUTH-SET MISMATCH: run name maps to '{base_sample}' but the "
+            f"run VCF sample '{run_sample_name}' maps to '{embedded}'. hap.py will use "
+            f"the '{base_sample}' truth set -- verify the run is labelled correctly."
+        )
     # Get regions from reference FASTA index
     regions = ",".join(line.split('\t')[0] for line in open(ref_fai))
     
@@ -272,7 +238,7 @@ def process_happy(sample, run, stratified=False):
                 raise RuntimeError(f"bcftools failed to filter gvcf: {e}")
     # Prepare Docker-internal paths (use base_sample for reference paths)
     docker_ref_vcf = f'/wgs/data/reference/{base_sample}/{ref_vcf.name}'
-    docker_ref_sdf = f'/wgs/data/reference/{ref_sdf.name}'
+    docker_ref_sdf = f'/wgs/data/reference/{ref_sdf_name}'
     docker_run_gvcf = f'/wgs/data/lab_runs/{sample}_{run}/{filtered_gvcf.name}'
     docker_ref_bed = f'/wgs/data/reference/{base_sample}/{ref_bed.name}'
     docker_ref_fasta = f'/wgs/data/reference/{ref_fasta.name}'
@@ -312,9 +278,12 @@ def post_happy_metrics(sample, run, out_dir_path):
     if not summary_file:
         raise FileNotFoundError(f"No summary file found in {out_dir_path}")
     # Parse summary file
-    print(f"Parsing summary file: {summary_file}") #debug ************
-    summary_metrics = parse_summary(summary_file)
-    if not summary_metrics:
+    print(f"Parsing summary file: {summary_file}")
+    # Persist EVERY (Type, Filter) row hap.py emits (SNP/INDEL x ALL/PASS),
+    # not just SNP/ALL: the INDEL rows are half the small-variant benchmark and
+    # were previously dropped before reaching the database.
+    summary_rows = parse_summary_rows(summary_file)
+    if not summary_rows:
         print("No summary metrics found.")
         return
     run_name = f"{sample}_{run}"
@@ -340,30 +309,36 @@ def post_happy_metrics(sample, run, out_dir_path):
         "TRUTH.TOTAL.het_hom_ratio": "truth_het_hom_ratio",
         "QUERY.TOTAL.het_hom_ratio": "query_het_hom_ratio",
     }
-    # Build dict with correct keys and types
-    metric_data = {}
-    for csv_key, schema_key in key_map.items():
-        val = summary_metrics.get(csv_key)
-        if schema_key in ["type", "filter"]:
-            metric_data[schema_key] = val
-        elif val is None or val == "":
-            metric_data[schema_key] = 0
-        elif schema_key in [
-            "truth_total", "truth_tp", "truth_fn", "query_total", "query_fp", "query_unk"
-        ]:
-            metric_data[schema_key] = int(float(val))
-        else:
-            metric_data[schema_key] = float(val)
-    metric_data["run_id"] = run_id
-    # Validate and send
+    # Build dict with correct keys and types (one per summary row)
+    def _build_metric(row):
+        metric_data = {}
+        for csv_key, schema_key in key_map.items():
+            val = row.get(csv_key)
+            if schema_key in ["type", "filter"]:
+                metric_data[schema_key] = val
+            elif val is None or val == "":
+                metric_data[schema_key] = 0
+            elif schema_key in [
+                "truth_total", "truth_tp", "truth_fn", "query_total", "query_fp", "query_unk"
+            ]:
+                metric_data[schema_key] = int(float(val))
+            else:
+                metric_data[schema_key] = float(val)
+        metric_data["run_id"] = run_id
+        return metric_data
+    # Validate and send. Replace any existing rows for this run so a re-run is
+    # idempotent instead of accumulating duplicate metric rows.
     try:
-        validated_metrics = schemas.HappyMetricCreate(**metric_data)
         db = SessionLocal()
         try:
-            crud.create_happy_metric(db, validated_metrics)
+            for existing in crud.get_happy_metrics(db, run_id):
+                crud.delete_happy_metric(db, existing.id)
+            for row in summary_rows:
+                validated_metrics = schemas.HappyMetricCreate(**_build_metric(row))
+                crud.create_happy_metric(db, validated_metrics)
         finally:
             db.close()
-        print(f"Successfully posted happy metric for {run_name}.")
+        print(f"Successfully posted {len(summary_rows)} happy metric row(s) for {run_name}.")
     except Exception as e:
         print(f"Validation error: {e}")
         raise
@@ -411,15 +386,20 @@ def process_truvari(sample, run):
     # Find output directory or create if it doesnt exist
     PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
     output_path = None
+    # Anchor on the full "_{sample}_{run}" suffix (processed dirs are named
+    # "{date}_{sample}_{run}") so a bare run token like "R001" cannot match a
+    # *different* sample's directory and silently write this run's Truvari
+    # output into it.
+    run_suffix = f"_{sample}_{run}"
     for name in os.listdir(PROCESSED_DIR):
-        if run in name:
+        if name.endswith(run_suffix):
             output_path = PROCESSED_DIR / name
             break
     if output_path is None:
         # Create output directory without date prefix
-        output_path = PROCESSED_DIR / run
+        output_path = PROCESSED_DIR / f"{sample}_{run}"
         output_path.mkdir(parents=True, exist_ok=True)
-        print(f"No output path found for {run} in {PROCESSED_DIR}.\nCreating directory.")
+        print(f"No output path found for {sample}_{run} in {PROCESSED_DIR}.\nCreating directory.")
     # Filter VCFs with bcftools
     filtered_ref_vcf = ref_dir_path / ref_vcf.name.replace('.vcf.gz', '.filtered.vcf.gz')
     normalized_ref_vcf = ref_dir_path / ref_vcf.name.replace('.vcf.gz', '.normalized.vcf.gz')
@@ -489,13 +469,19 @@ def process_truvari(sample, run):
             raise RuntimeError(f"Failed to normalize BED file: {e}") from e
     
     # Run Truvari
+    # truvari bench refuses to run if its -o directory already exists; remove a
+    # stale one so re-processing a run does not abort with a generic
+    # "Truvari failed" (e.g. after a previous successful or partial run).
+    truvari_out_dir = output_path / 'truvari'
+    if truvari_out_dir.exists():
+        shutil.rmtree(truvari_out_dir, ignore_errors=True)
     truvari_script = PROJECT_ROOT / 'pipeline' / 'truvari.sh'
     cmd = [
         str(truvari_script),
         to_container(normalized_ref_vcf),  # Use normalized reference VCF
         to_container(filtered_run_vcf),
         to_container(normalized_bed),  # Use normalized BED file
-        to_container(output_path / 'truvari')
+        to_container(truvari_out_dir)
     ]
     try:
         subprocess.run(cmd, check=True, cwd=PROJECT_ROOT)
@@ -546,9 +532,10 @@ def process_csv_files(run):
     input_dir = LAB_RUN_DIR / run
     PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
     output_path = None
-    # Find output directory with prefixed date
+    # Find output directory with prefixed date. Anchor on "_{run}" (here `run`
+    # is the full "{sample}_{run}") so the match cannot land on another run's dir.
     for name in os.listdir(PROCESSED_DIR):
-        if run in name:
+        if name.endswith(f"_{run}"):
             output_path = PROCESSED_DIR / name
             break
     if output_path is None:
