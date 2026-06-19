@@ -17,3 +17,4 @@ __pycache__/
 /test-fixtures/
 /.claude/
 truvari.log
+.gstack/
