@@ -645,6 +645,8 @@ def register_callbacks(app):
                 disp = f"{int(ref_val):,}"
             elif ref_val == "SNP":
                 continue
+            elif isinstance(ref_val, str):
+                disp = ref_val
             elif pd.notna(ref_val):
                 disp = f"{ref_val:.4f}"
             else:
@@ -664,6 +666,8 @@ def register_callbacks(app):
             ref_val = df.loc[metric, ref]
             if metric in INT_METRICS and pd.notna(ref_val):
                 disp = f"{int(ref_val):,}"
+            elif isinstance(ref_val, str):
+                disp = ref_val
             elif pd.notna(ref_val):
                 disp = f"{ref_val:.4f}"
             else:
