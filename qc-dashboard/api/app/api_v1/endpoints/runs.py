@@ -116,25 +116,36 @@ def delete_lab_run(
 @router.get("/runs")
 def list_lab_runs(db: Session = Depends(get_db)):
     """List all lab runs."""
+    # Query the DB first. A failure here means the database is unavailable, so
+    # surface it as 503 rather than silently falling back to filesystem-derived
+    # rows (id=None, status forced to AWAITING_APPROVAL) -- that fallback masks
+    # the outage and makes an APPROVED run look un-approved.
     try:
-        runs_by_name = {}
-        try:
-            for run in crud.get_lab_runs(db):
-                runs_by_name[run.run_name] = {
-                    "id": run.id,
-                    "run_name": run.run_name,
-                    "status": run.status.value,
-                    "created_at": run.created_at,
-                    "updated_at": run.updated_at,
-                    "approved_at": run.approved_at,
-                    "error_message": run.error_message,
-                }
-        except Exception:
-            db.rollback()
+        db_runs = crud.get_lab_runs(db)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=503,
+            detail="Database unavailable; cannot list runs.",
+        ) from e
 
-        if not LAB_RUNS_DIR.exists():
-            return list(runs_by_name.values())
-        
+    runs_by_name = {
+        run.run_name: {
+            "id": run.id,
+            "run_name": run.run_name,
+            "status": run.status.value,
+            "created_at": run.created_at,
+            "updated_at": run.updated_at,
+            "approved_at": run.approved_at,
+            "error_message": run.error_message,
+        }
+        for run in db_runs
+    }
+
+    # Augment with on-disk runs that are not yet recorded in the DB (a genuine
+    # case: an uploaded run not yet ingested). setdefault never overrides a DB
+    # row, so a known run keeps its real id and status.
+    if LAB_RUNS_DIR.exists():
         for run in LAB_RUNS_DIR.iterdir():
             if run.is_dir():
                 # Check if it's been processed
@@ -152,9 +163,8 @@ def list_lab_runs(db: Session = Depends(get_db)):
                     "approved_at": None,
                     "error_message": None,
                 })
-        return list(runs_by_name.values())
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error listing runs: {str(e)}")
+
+    return list(runs_by_name.values())
     
 @router.get("/runs/{run_name}/benchmarking")
 def get_run_benchmarking(run_name: str, db: Session = Depends(get_db)):
