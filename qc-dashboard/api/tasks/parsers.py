@@ -91,6 +91,23 @@ def parse_summary(input_filepath):
                 return row
     return None
 
+def parse_summary_rows(input_filepath):
+    """
+    Parse the hap.py summary file and return ALL rows -- one dict per
+    (Type, Filter) combination (e.g. SNP/ALL, SNP/PASS, INDEL/ALL, INDEL/PASS).
+
+    parse_summary() above returns only the SNP/ALL row, which silently dropped
+    the INDEL benchmark (half the small-variant results) before it ever reached
+    the database. Use this to persist the full hap.py output.
+    """
+    rows = []
+    with open(input_filepath, newline='') as file:
+        reader = csv.DictReader(file, delimiter=',')
+        for row in reader:
+            if row.get("Type") and row.get("Filter"):
+                rows.append(dict(row))
+    return rows
+
 def read_metrics_csv(path_metrics: str) -> pd.Series:
     """
     Lit un fichier *_sv_metrics.csv (colonnes 'parameter', 'value', 'percentage')

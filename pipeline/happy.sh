@@ -31,7 +31,7 @@ docker run \
     --cpus="$HAPPY_CPUS" \
     --memory="$HAPPY_MEMORY" \
     --memory-swap="$HAPPY_MEMORY_SWAP" \
-    -e HGREF=/wgs/data/reference/GCA_000001405.15_GRCh38_no_alt_analysis_set.fasta \
+    -e HGREF="${docker_ref_fasta}" \
     -v "$(pwd):/wgs" \
     "$HAPPY_IMAGE" \
     hap.py \
@@ -42,6 +42,6 @@ docker run \
     --logfile "${docker_logfile}" \
     --threads "$HAPPY_CPUS" \
     -f "${docker_ref_bed}" \
-    -r /wgs/data/reference/GCA_000001405.15_GRCh38_no_alt_analysis_set.fasta \
+    -r "${docker_ref_fasta}" \
     -o "${docker_out_dir}" \
     "$@"  # <- pass remaining args like --stratification if any
